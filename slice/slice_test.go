@@ -82,3 +82,24 @@ func TestFindIf(t *testing.T) {
 		}
 	}
 }
+
+func TestIncludes(t *testing.T) {
+	tests := []struct {
+		array  interface{}
+		value  interface{}
+		result bool
+	}{
+		{[]int{1, 2, 3, 4, 5}, 5, true},
+		{[]int{1, 2, 3, 4, 5}, 6, false},
+		{[]string{"a", "ab", "ba", "bb", "b"}, "b", true},
+		{[]string{"a", "ab", "ba", "bb", "b"}, "c", false},
+	}
+
+	for _, test := range tests {
+		res := Includes(test.array, test.value)
+		if res != test.result {
+			t.Fatalf("Includes(%v, %v), want %v, get %v",
+				test.array, test.value, test.result, res)
+		}
+	}
+}

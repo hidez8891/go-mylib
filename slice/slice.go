@@ -29,3 +29,7 @@ func FindIf(slice interface{}, cond func(i int) bool) int {
 	}
 	return -1
 }
+
+func Includes(slice interface{}, value interface{}) bool {
+	return Find(slice, value) >= 0
+}
