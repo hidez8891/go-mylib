@@ -1,6 +1,10 @@
 package slice
 
-import "testing"
+import (
+	"fmt"
+	"reflect"
+	"testing"
+)
 
 func TestEach(t *testing.T) {
 	{
@@ -28,6 +32,30 @@ func TestEach(t *testing.T) {
 
 		if acc != result {
 			t.Fatalf("Each: accumulate %v, want %v, get %v", array, result, acc)
+		}
+	}
+}
+
+func TestFilter(t *testing.T) {
+	{
+		array := []int{1, 2, 3, 4, 5}
+		expect := []int{1, 3, 5}
+		pred := func(i int) bool { return array[i]%2 == 1 }
+
+		result := Filter(array, pred)
+		if reflect.DeepEqual(result, expect) == false {
+			t.Fatalf("Filter: want %v, get %v", expect, result)
+		}
+	}
+
+	{
+		array := []string{"a", "ab", "ac", "bd", "e"}
+		expect := []string{"ab", "ac", "bd"}
+		pred := func(i int) bool { return len(array[i]) > 1 }
+
+		result := Filter(array, pred)
+		if reflect.DeepEqual(result, expect) == false {
+			t.Fatalf("Filter: want %v, get %v", expect, result)
 		}
 	}
 }
@@ -101,5 +129,18 @@ func TestIncludes(t *testing.T) {
 			t.Fatalf("Includes(%v, %v), want %v, get %v",
 				test.array, test.value, test.result, res)
 		}
+	}
+}
+
+func TestMap(t *testing.T) {
+	array := []int{1, 2, 3, 4, 5}
+	expect := []string{"1", "2", "3", "4", "5"}
+
+	result := Map(array, func(i int) string {
+		return fmt.Sprintf("%d", array[i])
+	}).([]string)
+
+	if reflect.DeepEqual(result, expect) == false {
+		t.Fatalf("Map want %v, get %v", expect, result)
 	}
 }
