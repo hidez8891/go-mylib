@@ -9,29 +9,29 @@ import (
 func TestEach(t *testing.T) {
 	{
 		array := []int{1, 2, 3, 4, 5}
-		result := 15
+		expect := 15
 
 		acc := 0
 		Each(array, func(i int) {
 			acc += array[i]
 		})
 
-		if acc != result {
-			t.Fatalf("Each: accumulate %v, want %v, get %v", array, result, acc)
+		if acc != expect {
+			t.Fatalf("Each: accumulate %v, want %v, get %v", array, expect, acc)
 		}
 	}
 
 	{
 		array := []string{"a", "b", "c", "d"}
-		result := "abcd"
+		expect := "abcd"
 
 		acc := ""
 		Each(array, func(i int) {
 			acc += array[i]
 		})
 
-		if acc != result {
-			t.Fatalf("Each: accumulate %v, want %v, get %v", array, result, acc)
+		if acc != expect {
+			t.Fatalf("Each: accumulate %v, want %v, get %v", array, expect, acc)
 		}
 	}
 }
@@ -64,7 +64,7 @@ func TestFind(t *testing.T) {
 	tests := []struct {
 		array  interface{}
 		value  interface{}
-		result int
+		expect int
 	}{
 		{[]int{1, 2, 3, 4, 5}, 5, 4},
 		{[]int{1, 2, 3, 4, 5}, 6, -1},
@@ -74,9 +74,9 @@ func TestFind(t *testing.T) {
 
 	for _, test := range tests {
 		index := Find(test.array, test.value)
-		if index != test.result {
+		if index != test.expect {
 			t.Fatalf("Find(%v, %v), want %v, get %v",
-				test.array, test.value, test.result, index)
+				test.array, test.value, test.expect, index)
 		}
 	}
 }
@@ -85,28 +85,30 @@ func TestFindIf(t *testing.T) {
 	{
 		array := []int{1, 2, 3, 4, 5}
 		value := 5
-		result := 4
+		expect := 4
 
 		index := FindIf(array, func(i int) bool {
 			return array[i] == value
 		})
 
-		if index != result {
-			t.Fatalf("FindIf(%v, %v), want %v, get %v", array, value, result, index)
+		if index != expect {
+			t.Fatalf("FindIf(%v, %v), want %v, get %v",
+				array, value, expect, index)
 		}
 	}
 
 	{
 		array := []string{"a", "b", "c", "d"}
 		value := "d"
-		result := 3
+		expect := 3
 
 		index := FindIf(array, func(i int) bool {
 			return array[i] == value
 		})
 
-		if index != result {
-			t.Fatalf("FindIf(%v, %v), want %v, get %v", array, value, result, index)
+		if index != expect {
+			t.Fatalf("FindIf(%v, %v), want %v, get %v",
+				array, value, expect, index)
 		}
 	}
 }
@@ -115,7 +117,7 @@ func TestIncludes(t *testing.T) {
 	tests := []struct {
 		array  interface{}
 		value  interface{}
-		result bool
+		expect bool
 	}{
 		{[]int{1, 2, 3, 4, 5}, 5, true},
 		{[]int{1, 2, 3, 4, 5}, 6, false},
@@ -124,10 +126,10 @@ func TestIncludes(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res := Includes(test.array, test.value)
-		if res != test.result {
+		result := Includes(test.array, test.value)
+		if result != test.expect {
 			t.Fatalf("Includes(%v, %v), want %v, get %v",
-				test.array, test.value, test.result, res)
+				test.array, test.value, test.expect, result)
 		}
 	}
 }
