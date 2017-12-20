@@ -2,6 +2,22 @@ package slice
 
 import "reflect"
 
+func Any(slice interface{}, pred func(i int) bool) bool {
+	return FindIndexIf(slice, pred) >= 0
+}
+
+func All(slice interface{}, pred func(i int) bool) bool {
+	rv := reflect.ValueOf(slice)
+	length := rv.Len()
+
+	for i := 0; i < length; i++ {
+		if pred(i) == false {
+			return false
+		}
+	}
+	return true
+}
+
 func ForEach(slice interface{}, callback func(i int)) {
 	rv := reflect.ValueOf(slice)
 	length := rv.Len()
@@ -56,4 +72,17 @@ func Map(slice interface{}, conv interface{}) interface{} {
 		out = reflect.Append(out, rs[0])
 	}
 	return out.Interface()
+}
+
+func Reduce(slice interface{}, accumulater interface{}) interface{} {
+	rv := reflect.ValueOf(slice)
+	fun := reflect.ValueOf(accumulater)
+	acc := reflect.New(fun.Type().Out(0)).Elem()
+
+	for i := 0; i < rv.Len(); i++ {
+		rs := fun.Call([]reflect.Value{acc, reflect.ValueOf(i)})
+		acc = rs[0]
+	}
+
+	return acc.Interface()
 }

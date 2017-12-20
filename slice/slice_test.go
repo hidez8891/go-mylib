@@ -6,6 +6,45 @@ import (
 	"testing"
 )
 
+func TestAny(t *testing.T) {
+	tests := []struct {
+		array  []int
+		value  int
+		expect bool
+	}{
+		{[]int{1, 2, 3, 4, 5}, 5, true},
+		{[]int{1, 2, 3, 4, 5}, 6, false},
+	}
+
+	for _, test := range tests {
+		result := Any(test.array, func(i int) bool {
+			return test.array[i] == test.value
+		})
+		if result != test.expect {
+			t.Fatalf("Any: want %v, get %v", test.expect, result)
+		}
+	}
+}
+
+func TestAll(t *testing.T) {
+	tests := []struct {
+		array  []int
+		expect bool
+	}{
+		{[]int{1, 2, 3, 4, 5}, false},
+		{[]int{2, 4, 6, 8, 10}, true},
+	}
+
+	for _, test := range tests {
+		result := All(test.array, func(i int) bool {
+			return test.array[i]%2 == 0
+		})
+		if result != test.expect {
+			t.Fatalf("All: want %v, get %v", test.expect, result)
+		}
+	}
+}
+
 func TestForEach(t *testing.T) {
 	{
 		array := []int{1, 2, 3, 4, 5}
@@ -143,6 +182,34 @@ func TestMap(t *testing.T) {
 	}).([]string)
 
 	if reflect.DeepEqual(result, expect) == false {
-		t.Fatalf("Map want %v, get %v", expect, result)
+		t.Fatalf("Map: want %v, get %v", expect, result)
+	}
+}
+
+func TestReduce(t *testing.T) {
+	{
+		array := []int{1, 2, 3, 4, 5}
+		expect := 15
+
+		result := Reduce(array, func(acc, i int) int {
+			return acc + array[i]
+		}).(int)
+
+		if expect != result {
+			t.Fatalf("Reduce: want %v, get %v", expect, result)
+		}
+	}
+
+	{
+		array := []int{1, 2, 3, 4, 5}
+		expect := "12345"
+
+		result := Reduce(array, func(acc string, i int) string {
+			return acc + fmt.Sprintf("%d", array[i])
+		}).(string)
+
+		if expect != result {
+			t.Fatalf("Reduce: want %v, get %v", expect, result)
+		}
 	}
 }
