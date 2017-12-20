@@ -6,18 +6,18 @@ import (
 	"testing"
 )
 
-func TestEach(t *testing.T) {
+func TestForEach(t *testing.T) {
 	{
 		array := []int{1, 2, 3, 4, 5}
 		expect := 15
 
 		acc := 0
-		Each(array, func(i int) {
+		ForEach(array, func(i int) {
 			acc += array[i]
 		})
 
 		if acc != expect {
-			t.Fatalf("Each: accumulate %v, want %v, get %v", array, expect, acc)
+			t.Fatalf("ForEach: accumulate %v, want %v, get %v", array, expect, acc)
 		}
 	}
 
@@ -26,12 +26,12 @@ func TestEach(t *testing.T) {
 		expect := "abcd"
 
 		acc := ""
-		Each(array, func(i int) {
+		ForEach(array, func(i int) {
 			acc += array[i]
 		})
 
 		if acc != expect {
-			t.Fatalf("Each: accumulate %v, want %v, get %v", array, expect, acc)
+			t.Fatalf("ForEach: accumulate %v, want %v, get %v", array, expect, acc)
 		}
 	}
 }
@@ -60,7 +60,7 @@ func TestFilter(t *testing.T) {
 	}
 }
 
-func TestFind(t *testing.T) {
+func TestFindIndex(t *testing.T) {
 	tests := []struct {
 		array  interface{}
 		value  interface{}
@@ -73,26 +73,26 @@ func TestFind(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		index := Find(test.array, test.value)
+		index := FindIndex(test.array, test.value)
 		if index != test.expect {
-			t.Fatalf("Find(%v, %v), want %v, get %v",
+			t.Fatalf("FindIndex(%v, %v), want %v, get %v",
 				test.array, test.value, test.expect, index)
 		}
 	}
 }
 
-func TestFindIf(t *testing.T) {
+func TestFindIndexIf(t *testing.T) {
 	{
 		array := []int{1, 2, 3, 4, 5}
 		value := 5
 		expect := 4
 
-		index := FindIf(array, func(i int) bool {
+		index := FindIndexIf(array, func(i int) bool {
 			return array[i] == value
 		})
 
 		if index != expect {
-			t.Fatalf("FindIf(%v, %v), want %v, get %v",
+			t.Fatalf("FindIndexIf(%v, %v), want %v, get %v",
 				array, value, expect, index)
 		}
 	}
@@ -102,12 +102,12 @@ func TestFindIf(t *testing.T) {
 		value := "d"
 		expect := 3
 
-		index := FindIf(array, func(i int) bool {
+		index := FindIndexIf(array, func(i int) bool {
 			return array[i] == value
 		})
 
 		if index != expect {
-			t.Fatalf("FindIf(%v, %v), want %v, get %v",
+			t.Fatalf("FindIndexIf(%v, %v), want %v, get %v",
 				array, value, expect, index)
 		}
 	}

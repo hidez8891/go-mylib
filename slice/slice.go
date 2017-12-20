@@ -2,7 +2,7 @@ package slice
 
 import "reflect"
 
-func Each(slice interface{}, callback func(i int)) {
+func ForEach(slice interface{}, callback func(i int)) {
 	rv := reflect.ValueOf(slice)
 	length := rv.Len()
 
@@ -23,14 +23,14 @@ func Filter(slice interface{}, pred func(i int) bool) interface{} {
 	return out.Interface()
 }
 
-func Find(slice interface{}, value interface{}) int {
+func FindIndex(slice interface{}, value interface{}) int {
 	rv := reflect.ValueOf(slice)
-	return FindIf(slice, func(i int) bool {
+	return FindIndexIf(slice, func(i int) bool {
 		return reflect.DeepEqual(rv.Index(i).Interface(), value)
 	})
 }
 
-func FindIf(slice interface{}, cond func(i int) bool) int {
+func FindIndexIf(slice interface{}, cond func(i int) bool) int {
 	rv := reflect.ValueOf(slice)
 	length := rv.Len()
 
@@ -43,7 +43,7 @@ func FindIf(slice interface{}, cond func(i int) bool) int {
 }
 
 func Includes(slice interface{}, value interface{}) bool {
-	return Find(slice, value) >= 0
+	return FindIndex(slice, value) >= 0
 }
 
 func Map(slice interface{}, conv interface{}) interface{} {
