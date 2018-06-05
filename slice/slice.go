@@ -1,11 +1,14 @@
+// Package slice provides slice helper function.
 package slice
 
 import "reflect"
 
+// Any tests whether at least one value in the slice pass pred().
 func Any(slice interface{}, pred func(i int) bool) bool {
 	return FindIndexIf(slice, pred) >= 0
 }
 
+// All tests whether all values in the slice pass pred().
 func All(slice interface{}, pred func(i int) bool) bool {
 	rv := reflect.ValueOf(slice)
 	length := rv.Len()
@@ -18,6 +21,7 @@ func All(slice interface{}, pred func(i int) bool) bool {
 	return true
 }
 
+// ForEach executes callback() for each slice's value.
 func ForEach(slice interface{}, callback func(i int)) {
 	rv := reflect.ValueOf(slice)
 	length := rv.Len()
@@ -27,6 +31,7 @@ func ForEach(slice interface{}, callback func(i int)) {
 	}
 }
 
+// Filter creates a new slice with all values that pass pred().
 func Filter(slice interface{}, pred func(i int) bool) interface{} {
 	rv := reflect.ValueOf(slice)
 	out := reflect.MakeSlice(reflect.SliceOf(rv.Type().Elem()), 0, rv.Len())
@@ -39,6 +44,8 @@ func Filter(slice interface{}, pred func(i int) bool) interface{} {
 	return out.Interface()
 }
 
+// FindIndex returns index of the value in the slice.
+// Otherwise -1 is returned.
 func FindIndex(slice interface{}, value interface{}) int {
 	rv := reflect.ValueOf(slice)
 	return FindIndexIf(slice, func(i int) bool {
@@ -46,6 +53,8 @@ func FindIndex(slice interface{}, value interface{}) int {
 	})
 }
 
+// FindIndexIf returns index of the value in the slice that satisfy cond().
+// Otherwise -1 is returned.
 func FindIndexIf(slice interface{}, cond func(i int) bool) int {
 	rv := reflect.ValueOf(slice)
 	length := rv.Len()
@@ -58,10 +67,13 @@ func FindIndexIf(slice interface{}, cond func(i int) bool) int {
 	return -1
 }
 
+// Includes determines whether the slice includes the value.
 func Includes(slice interface{}, value interface{}) bool {
 	return FindIndex(slice, value) >= 0
 }
 
+// Map creates a new slice with the results of calling conv() on
+// every element in the slice.
 func Map(slice interface{}, conv interface{}) interface{} {
 	rv := reflect.ValueOf(slice)
 	fun := reflect.ValueOf(conv)
@@ -74,6 +86,8 @@ func Map(slice interface{}, conv interface{}) interface{} {
 	return out.Interface()
 }
 
+// Reduce applies a function against accumulater() and each element
+// in the slice to reduce it to a single value.
 func Reduce(slice interface{}, accumulater interface{}) interface{} {
 	rv := reflect.ValueOf(slice)
 	fun := reflect.ValueOf(accumulater)

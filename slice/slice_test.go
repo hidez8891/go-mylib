@@ -213,3 +213,105 @@ func TestReduce(t *testing.T) {
 		}
 	}
 }
+
+func ExampleAny() {
+	array := []int{1, 2, 3, 4, 5}
+
+	fmt.Println(Any(array, func(i int) bool {
+		return array[i]%2 == 0
+	}))
+	// Output:
+	// true
+}
+
+func ExampleAll() {
+	array := []int{2, 4, 6, 8, 10}
+
+	fmt.Println(All(array, func(i int) bool {
+		return array[i]%2 == 0
+	}))
+	// Output:
+	// true
+}
+
+func ExampleForEach() {
+	array := []int{1, 2, 3, 4, 5}
+
+	ForEach(array, func(i int) {
+		fmt.Println(array[i])
+	})
+	// Output:
+	// 1
+	// 2
+	// 3
+	// 4
+	// 5
+}
+
+func ExampleFilter() {
+	array := []int{1, 2, 3, 4, 5}
+	result := Filter(array, func(i int) bool {
+		return array[i]%2 == 1
+	}).([]int)
+
+	for _, v := range result {
+		fmt.Println(v)
+	}
+	// Output:
+	// 1
+	// 3
+	// 5
+}
+
+func ExampleFindIndex() {
+	array := []int{1, 2, 3, 4, 5}
+
+	fmt.Println(FindIndex(array, 4))
+	// Output:
+	// 3
+}
+
+func ExampleFindIndexIf() {
+	array := []int{1, 2, 3, 4, 5}
+
+	fmt.Println(FindIndexIf(array, func(i int) bool {
+		return array[i]%2 == 0
+	}))
+	// Output:
+	// 1
+}
+
+func ExampleIncludes() {
+	array := []int{1, 2, 3, 4, 5}
+
+	fmt.Println(Includes(array, 4))
+	// Output:
+	// true
+}
+
+func ExampleMap() {
+	array := []int{1, 2, 3, 4, 5}
+	result := Map(array, func(i int) int {
+		return array[i] * 2
+	}).([]int)
+
+	for _, v := range result {
+		fmt.Println(v)
+	}
+	// Output:
+	// 2
+	// 4
+	// 6
+	// 8
+	// 10
+}
+
+func ExampleReduce() {
+	array := []int{1, 2, 3, 4, 5}
+
+	fmt.Println(Reduce(array, func(acc string, i int) string {
+		return acc + fmt.Sprintf("%d", array[i])
+	}).(string))
+	// Output:
+	// 12345
+}
