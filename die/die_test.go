@@ -1,10 +1,9 @@
-package die_test
+package die
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
-
-	die "."
 )
 
 func TestRaiseMessage(t *testing.T) {
@@ -26,12 +25,12 @@ func TestRaiseMessage(t *testing.T) {
 }
 
 func convertIfThree(n int) (ret string) {
-	defer die.Revival(func(msg interface{}) {
+	defer Revival(func(msg interface{}) {
 		str := msg.(string)
 		ret = str
 	})
 
-	die.If(n == 3, fmt.Sprintf("three!"))
+	If(n == 3, fmt.Sprintf("three!"))
 	return fmt.Sprintf("%d", n)
 }
 
@@ -54,14 +53,14 @@ func TestRaiseError(t *testing.T) {
 }
 
 func failIfThree(n int) (err error) {
-	defer die.RevivalErr(func(e error) {
+	defer RevivalErr(func(e error) {
 		err = e
 	})
 
 	if n == 3 {
 		err = fmt.Errorf("three!")
 	}
-	die.IfErr(err)
+	IfErr(err)
 	return nil
 }
 
@@ -81,7 +80,7 @@ func TestRaiseMessageDetail(t *testing.T) {
 		exp string
 	}{
 		{0, "0"},
-		{3, "three! line:102"},
+		{3, "three! line:101"},
 		{5, "5"},
 	}
 
@@ -94,11 +93,67 @@ func TestRaiseMessageDetail(t *testing.T) {
 }
 
 func convertIfThreeDetail(n int) (ret string) {
-	defer die.RevivalDetail(func(_ string, line int, msg interface{}) {
+	defer RevivalDetail(func(_ string, line int, msg interface{}) {
 		str := msg.(string)
 		ret = fmt.Sprintf("%s line:%d", str, line)
 	})
 
-	die.If(n == 3, fmt.Sprintf("three!"))
+	If(n == 3, fmt.Sprintf("three!"))
 	return fmt.Sprintf("%d", n)
+}
+
+func ExampleIf() {
+	defer Revival(func(msg interface{}) {
+		fmt.Println(msg)
+	})
+
+	If(0 == 1, fmt.Sprintf("0 == 1 == true"))
+	If(0 != 1, fmt.Sprintf("0 != 1 == true"))
+	// Output:
+	// 0 != 1 == true
+}
+
+func ExampleIfErr() {
+	defer RevivalErr(func(err error) {
+		fmt.Println(err)
+	})
+
+	IfErr(nil)
+	IfErr(fmt.Errorf("error message!"))
+	// Output:
+	// error message!
+}
+
+func ExampleRevival() {
+	defer Revival(func(msg interface{}) {
+		fmt.Println(msg)
+	})
+
+	If(0 != 1, fmt.Sprintf("0 != 1 == true"))
+	// Output:
+	// 0 != 1 == true
+}
+
+func ExampleRevivalErr() {
+	defer RevivalErr(func(err error) {
+		fmt.Println(err)
+	})
+
+	IfErr(fmt.Errorf("error message!"))
+	// Output:
+	// error message!
+}
+
+func ExampleRevivalDetail() {
+	defer RevivalDetail(func(file string, line int, msg interface{}) {
+		fmt.Println(filepath.Base(file))
+		fmt.Println(line)
+		fmt.Println(msg)
+	})
+
+	If(0 != 1, fmt.Sprintf("error message"))
+	// Output:
+	// die_test.go
+	// 154
+	// error message
 }

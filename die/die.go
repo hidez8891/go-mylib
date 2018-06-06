@@ -1,3 +1,4 @@
+// Package die provides error handling.
 package die
 
 import (
@@ -16,11 +17,12 @@ func If(cond bool, msg interface{}) {
 	dieIf(cond, msg)
 }
 
-// If raise err if err is not nil.
+// IfErr raise err if err is not nil.
 func IfErr(err error) {
 	dieIf(err != nil, err)
 }
 
+// dieIF raise *message if cond is true.
 func dieIf(cond bool, msg interface{}) {
 	if cond {
 		_, file, line, _ := runtime.Caller(2)
@@ -75,6 +77,8 @@ func RevivalDetail(f func(string, int, interface{})) {
 	)
 }
 
+// revival executes f1() if m is *message, otherwise executes f2().
+// if m is nil, skip execution.
 func revival(m interface{}, f1 func(*message), f2 func(interface{})) {
 	if m != nil {
 		if msg, ok := m.(*message); ok {
