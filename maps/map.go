@@ -1,27 +1,20 @@
-// Package dict provides map[] helper function.
-package dict
-
-import "reflect"
+// Package maps provides map[] helper function.
+package maps
 
 // Keys return map[]'s key slice
-func Keys(dict interface{}) interface{} {
-	rv := reflect.ValueOf(dict)
-	out := reflect.MakeSlice(reflect.SliceOf(rv.Type().Key()), 0, rv.Len())
-
-	for _, k := range rv.MapKeys() {
-		out = reflect.Append(out, k)
+func Keys[K comparable, T any](m map[K]T) []K {
+	out := make([]K, 0, len(m))
+	for k, _ := range m {
+		out = append(out, k)
 	}
-	return out.Interface()
+	return out
 }
 
 // Values return map[]'s value slice
-func Values(dict interface{}) interface{} {
-	rv := reflect.ValueOf(dict)
-	out := reflect.MakeSlice(reflect.SliceOf(rv.Type().Elem()), 0, rv.Len())
-
-	for _, k := range rv.MapKeys() {
-		v := rv.MapIndex(k)
-		out = reflect.Append(out, v)
+func Values[K comparable, T any](m map[K]T) []T {
+	out := make([]T, 0, len(m))
+	for _, v := range m {
+		out = append(out, v)
 	}
-	return out.Interface()
+	return out
 }

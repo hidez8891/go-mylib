@@ -1,4 +1,4 @@
-package dict
+package maps
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ func TestKeys(t *testing.T) {
 	dict := map[string]int{"a": 1, "b": 2, "c": 3}
 	expect := []string{"a", "b", "c"}
 
-	result := Keys(dict).([]string)
+	result := Keys(dict)
 	sort.Slice(result, func(a, b int) bool {
 		return result[a] < result[b]
 	})
@@ -25,7 +25,7 @@ func TestValues(t *testing.T) {
 	dict := map[string]int{"a": 1, "b": 2, "c": 3}
 	expect := []int{1, 2, 3}
 
-	result := Values(dict).([]int)
+	result := Values(dict)
 	sort.Slice(result, func(a, b int) bool {
 		return result[a] < result[b]
 	})
@@ -37,7 +37,7 @@ func TestValues(t *testing.T) {
 
 func ExampleKeys() {
 	dict := map[string]int{"a": 1, "b": 2, "c": 3}
-	keys := Keys(dict).([]string)
+	keys := Keys(dict)
 
 	for _, k := range keys {
 		fmt.Println(k)
@@ -50,7 +50,7 @@ func ExampleKeys() {
 
 func ExampleValues() {
 	dict := map[string]int{"a": 1, "b": 2, "c": 3}
-	vals := Values(dict).([]int)
+	vals := Values(dict)
 
 	for _, v := range vals {
 		fmt.Println(v)
