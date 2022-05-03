@@ -1,5 +1,5 @@
-// Package slice provides slice helper function.
-package slice
+// Package slices provides slice helper function.
+package slices
 
 // Any tests whether at least one value in the slice pass pred().
 func Any[T comparable](s []T, pred func(v T) bool) bool {
