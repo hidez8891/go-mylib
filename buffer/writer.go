@@ -18,7 +18,7 @@ func NewWriter(buf *Buffer) *Writer {
 
 // Write writes []byte to Buffer.
 // This function updates the write position.
-func (w *Writer) Write(b []byte) (n int, err error) {
+func (w *Writer) Write(b []byte) (int, error) {
 	size := w.pos + len(b)
 	if w.buf.Len() < size {
 		w.buf.grow(size - w.buf.Len())
@@ -31,7 +31,7 @@ func (w *Writer) Write(b []byte) (n int, err error) {
 
 // WriteAt writes []byte to Buffer at offset off.
 // This function does not update the write position.
-func (w *Writer) WriteAt(b []byte, off int64) (n int, err error) {
+func (w *Writer) WriteAt(b []byte, off int64) (int, error) {
 	size := int(off) + len(b)
 	if w.buf.Len() < size {
 		w.buf.grow(size - w.buf.Len())

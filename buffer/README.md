@@ -14,14 +14,14 @@ import "go-mylib/buffer"
   - [func (b *Buffer) Len() int](<#func-buffer-len>)
 - [type Reader](<#type-reader>)
   - [func NewReader(buf *Buffer) *Reader](<#func-newreader>)
-  - [func (r *Reader) Read(b []byte) (n int, err error)](<#func-reader-read>)
-  - [func (r *Reader) ReadAt(b []byte, off int64) (n int, err error)](<#func-reader-readat>)
+  - [func (r *Reader) Read(b []byte) (int, error)](<#func-reader-read>)
+  - [func (r *Reader) ReadAt(b []byte, off int64) (int, error)](<#func-reader-readat>)
   - [func (r *Reader) Seek(offset int64, whence int) (int64, error)](<#func-reader-seek>)
 - [type Writer](<#type-writer>)
   - [func NewWriter(buf *Buffer) *Writer](<#func-newwriter>)
   - [func (w *Writer) Seek(offset int64, whence int) (int64, error)](<#func-writer-seek>)
-  - [func (w *Writer) Write(b []byte) (n int, err error)](<#func-writer-write>)
-  - [func (w *Writer) WriteAt(b []byte, off int64) (n int, err error)](<#func-writer-writeat>)
+  - [func (w *Writer) Write(b []byte) (int, error)](<#func-writer-write>)
+  - [func (w *Writer) WriteAt(b []byte, off int64) (int, error)](<#func-writer-writeat>)
 
 
 ## type [Buffer](<https://github.com/hidez8891/go-mylib/blob/master/buffer/buffer.go#L4-L6>)
@@ -79,7 +79,7 @@ NewReader returns buf's Reader\.
 ### func \(\*Reader\) [Read](<https://github.com/hidez8891/go-mylib/blob/master/buffer/reader.go#L24>)
 
 ```go
-func (r *Reader) Read(b []byte) (n int, err error)
+func (r *Reader) Read(b []byte) (int, error)
 ```
 
 Read reads \[\]byte from Buffer\. This function updates the read position\.
@@ -87,7 +87,7 @@ Read reads \[\]byte from Buffer\. This function updates the read position\.
 ### func \(\*Reader\) [ReadAt](<https://github.com/hidez8891/go-mylib/blob/master/buffer/reader.go#L36>)
 
 ```go
-func (r *Reader) ReadAt(b []byte, off int64) (n int, err error)
+func (r *Reader) ReadAt(b []byte, off int64) (int, error)
 ```
 
 ReadAt writes \[\]byte from Buffer at offset off\. This function does not update the read position\.
@@ -129,7 +129,7 @@ Seek sets the next write position\.
 ### func \(\*Writer\) [Write](<https://github.com/hidez8891/go-mylib/blob/master/buffer/writer.go#L21>)
 
 ```go
-func (w *Writer) Write(b []byte) (n int, err error)
+func (w *Writer) Write(b []byte) (int, error)
 ```
 
 Write writes \[\]byte to Buffer\. This function updates the write position\.
@@ -137,7 +137,7 @@ Write writes \[\]byte to Buffer\. This function updates the write position\.
 ### func \(\*Writer\) [WriteAt](<https://github.com/hidez8891/go-mylib/blob/master/buffer/writer.go#L34>)
 
 ```go
-func (w *Writer) WriteAt(b []byte, off int64) (n int, err error)
+func (w *Writer) WriteAt(b []byte, off int64) (int, error)
 ```
 
 WriteAt writes \[\]byte to Buffer at offset off\. This function does not update the write position\.

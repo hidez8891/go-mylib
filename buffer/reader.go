@@ -21,7 +21,7 @@ func NewReader(buf *Buffer) *Reader {
 
 // Read reads []byte from Buffer.
 // This function updates the read position.
-func (r *Reader) Read(b []byte) (n int, err error) {
+func (r *Reader) Read(b []byte) (int, error) {
 	if r.buf.Len() <= r.pos {
 		return 0, io.EOF
 	}
@@ -33,7 +33,7 @@ func (r *Reader) Read(b []byte) (n int, err error) {
 
 // ReadAt writes []byte from Buffer at offset off.
 // This function does not update the read position.
-func (r *Reader) ReadAt(b []byte, off int64) (n int, err error) {
+func (r *Reader) ReadAt(b []byte, off int64) (int, error) {
 	if r.buf.Len() <= int(off) {
 		return 0, io.EOF
 	}
