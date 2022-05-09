@@ -22,7 +22,6 @@ const (
 )
 
 const (
-	FlagCompressed     uint16 = 0x0001
 	FlagDataDescriptor uint16 = 0x0008
 	FlagUTF8           uint16 = 0x0800
 )
