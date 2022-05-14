@@ -58,7 +58,7 @@ func (r *Reader) Seek(offset int64, whence int) (int64, error) {
 		return 0, errors.New("negative position")
 	}
 
-	if r.buf.Len() <= int(offset) {
+	if r.buf.Len() < int(offset) {
 		return 0, io.EOF
 	}
 	r.pos = int(offset)
