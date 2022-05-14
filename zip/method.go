@@ -48,27 +48,3 @@ func newFlateWriter(w io.Writer) io.WriteCloser {
 func newDeflateReader(r io.Reader) io.ReadCloser {
 	return flate.NewReader(r)
 }
-
-type nopWriteCloser struct {
-	w io.Writer
-}
-
-func (w *nopWriteCloser) Write(p []byte) (int, error) {
-	return w.w.Write(p)
-}
-
-func (w *nopWriteCloser) Close() error {
-	return nil
-}
-
-type nopReadCloser struct {
-	r io.Reader
-}
-
-func (r *nopReadCloser) Read(p []byte) (int, error) {
-	return r.r.Read(p)
-}
-
-func (r *nopReadCloser) Close() error {
-	return nil
-}
