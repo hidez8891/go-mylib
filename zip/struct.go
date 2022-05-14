@@ -31,6 +31,13 @@ const (
 	MethodDeflated uint16 = 8
 )
 
+const (
+	MadeByMSDOS uint16 = 0x0000 // MS-DOS and OS/2 (FAT, FAT32)
+	MadeByUNIX  uint16 = 0x0300 // UNIX
+	MadeByNEFS  uint16 = 0x0a00 // Windows NTFS
+	MadeByOSX   uint16 = 0x1300 // OS X
+)
+
 type localFileHeader struct {
 	RequireVersion   uint16
 	Flags            uint16
