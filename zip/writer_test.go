@@ -1,39 +1,44 @@
 package zip
 
 import (
-	"bytes"
 	"go-mylib/buffer"
-	"io"
+	"io/ioutil"
 	"testing"
 )
 
-type writerTest struct {
-	content string
-}
-
-var wtests = []writerTest{
-	{
-		content: "Hello World!",
-	},
+var wtests = []string{
+	"data-descriptor",
+	"no-data-descriptor",
 }
 
 func TestWriter(t *testing.T) {
-	for _, tt := range wtests {
-		testWriter(t, tt)
+	for _, name := range wtests {
+		tt := tests[name]
+		t.Run(name, func(t *testing.T) {
+			testWriter(t, tt)
+		})
 	}
 }
 
-func testWriter(t *testing.T, tt writerTest) {
+func testWriter(t *testing.T, tt testcase) {
 	buf := new(buffer.Buffer)
 
 	zw, err := NewWriter(buffer.NewWriter(buf))
 	if err != nil {
 		t.Fatalf("NewWriter error=%#v", err)
 	}
-	fw, err := zw.Create("test.txt")
+
+	fw, err := zw.Create(tt.filename)
 	if err != nil {
 		t.Fatalf("Writer.Create error=%#v", err)
 	}
+	if err := fw.SetFlags(tt.flags); err != nil {
+		t.Fatalf("FileWriter.SetFlags error=%#v", err)
+	}
+	if err := fw.SetModifiedTime(tt.mtime); err != nil {
+		t.Fatalf("FileWriter.SetModifiedTime error=%#v", err)
+	}
+
 	if _, err := fw.Write([]byte(tt.content)); err != nil {
 		t.Fatalf("FileWriter.Write error=%#v", err)
 	}
@@ -44,22 +49,22 @@ func testWriter(t *testing.T, tt writerTest) {
 		t.Fatalf("Writer.Close error=%#v", err)
 	}
 
-	zr, err := NewReader(buffer.NewReader(buf))
+	// Reader read test
+	r := buffer.NewReader(buf)
+	testcaseCompare(t, r, tt)
+
+	// binary compare
+	bin1 := buf.Bytes()
+	bin2, err := ioutil.ReadFile("tests/" + tt.path)
 	if err != nil {
-		t.Fatalf("NewReader error=%#v", err)
+		t.Fatalf("ioutil.ReadFile error=%#v", err)
 	}
-	fr, err := zr.Files[0].Open()
-	if err != nil {
-		t.Fatalf("Reader.Open error=%#v", err)
+	if len(bin1) != len(bin2) {
+		t.Fatalf("File written size=%d, want=%d", len(bin1), len(bin2))
 	}
-	tmp := new(bytes.Buffer)
-	if _, err := io.Copy(tmp, fr); err != nil {
-		t.Fatalf("io.ReadCloser.Read error=%#v", err)
-	}
-	if err := fr.Close(); err != nil {
-		t.Fatalf("io.ReadCloser.Close error=%#v", err)
-	}
-	if tmp.String() != tt.content {
-		t.Errorf("write test content=%q, want=%q", tmp.String(), tt.content)
+	for i := 0; i < len(bin1); i++ {
+		if bin1[i] != bin2[i] {
+			t.Fatalf("File body[%0x]=%0x, want=%0x", i, bin1[i], bin2[i])
+		}
 	}
 }

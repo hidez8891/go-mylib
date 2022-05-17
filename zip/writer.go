@@ -119,6 +119,26 @@ func newFileWriter(w io.WriteSeeker, h *centralDirectoryHeader) *FileWriter {
 	}
 }
 
+func (fw *FileWriter) Flags() uint16 {
+	return fw.h.Flags
+}
+
+func (fw *FileWriter) SetFlags(flags uint16) error {
+	if fw.initialized {
+		return errors.New("operation is invalid after writing")
+	}
+	fw.h.Flags |= flags
+	return nil
+}
+
+func (fw *FileWriter) UnsetFlags(flags uint16) error {
+	if fw.initialized {
+		return errors.New("operation is invalid after writing")
+	}
+	fw.h.Flags &^= flags
+	return nil
+}
+
 func (fw *FileWriter) Name() string {
 	return fw.h.FileName
 }
