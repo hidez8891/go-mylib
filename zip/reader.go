@@ -48,8 +48,9 @@ func (r *Reader) init() error {
 			return err
 		}
 		r.Files[i] = &File{
-			r:    r.r,
-			cdir: cdir,
+			localFileHeader: cdir.localFileHeader,
+			r:               r.r,
+			cdir:            cdir,
 		}
 	}
 
@@ -57,6 +58,8 @@ func (r *Reader) init() error {
 }
 
 type File struct {
+	localFileHeader
+
 	r    io.ReadSeeker
 	cdir *centralDirectoryHeader
 }
