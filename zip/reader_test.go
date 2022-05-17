@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-type readerTest struct {
+type testcase struct {
 	path     string
 	filename string
 	content  string
@@ -16,7 +16,7 @@ type readerTest struct {
 	mtime    time.Time
 }
 
-var tests = map[string]readerTest{
+var tests = map[string]testcase{
 	"data-descriptor": {
 		path:     "test-dd.zip",
 		filename: "test.txt",
@@ -49,20 +49,24 @@ func TestReader(t *testing.T) {
 	}
 }
 
-func testReader(t *testing.T, tt readerTest) {
+func testReader(t *testing.T, tt testcase) {
 	r, err := os.Open("tests/" + tt.path)
 	if err != nil {
 		t.Fatalf("os.Open error=%v", err)
 	}
 	defer r.Close()
 
+	testcaseCompare(t, r, tt)
+}
+
+func testcaseCompare(t *testing.T, r io.ReadSeeker, tt testcase) {
 	zr, err := NewReader(r)
 	if err != nil {
 		t.Fatalf("NewReader error=%v", err)
 	}
 
 	if len(zr.Files) != 1 {
-		t.Fatalf("zip.Reader.Files size=%d, want=%d", len(zr.Files), 1)
+		t.Fatalf("Reader.Files size=%d, want=%d", len(zr.Files), 1)
 	}
 
 	f := zr.Files[0]
