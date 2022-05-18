@@ -9,6 +9,7 @@ import (
 var wtests = []string{
 	"data-descriptor",
 	"no-data-descriptor",
+	"comment",
 }
 
 func TestWriter(t *testing.T) {
@@ -27,6 +28,7 @@ func testWriter(t *testing.T, tt testcase) {
 	if err != nil {
 		t.Fatalf("NewWriter error=%#v", err)
 	}
+	zw.Comment = tt.zipcomment
 
 	fw, err := zw.Create(tt.filename)
 	if err != nil {
@@ -38,6 +40,7 @@ func testWriter(t *testing.T, tt testcase) {
 	if err := fw.SetModifiedTime(tt.mtime); err != nil {
 		t.Fatalf("FileWriter.SetModifiedTime error=%#v", err)
 	}
+	fw.Comment = tt.comment
 
 	if _, err := fw.Write([]byte(tt.content)); err != nil {
 		t.Fatalf("FileWriter.Write error=%#v", err)

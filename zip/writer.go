@@ -186,6 +186,7 @@ func (fw *FileWriter) Close() error {
 		fw.h.CRC32 = fw.crc32.Sum32()
 		fw.h.CompressedSize = uint32(fw.compCounter.Count)
 		fw.h.UncompressedSize = uint32(fw.uncompCounter.Count)
+		fw.h.Comment = fw.Comment
 	}
 
 	if fw.h.Flags&FlagDataDescriptor != 0 {
