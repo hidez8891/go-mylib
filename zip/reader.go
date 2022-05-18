@@ -10,7 +10,8 @@ import (
 type Reader struct {
 	r io.ReadSeeker
 
-	Files []*File
+	Files   []*File
+	Comment string
 }
 
 func NewReader(r io.ReadSeeker) (*Reader, error) {
@@ -37,6 +38,7 @@ func (r *Reader) init() error {
 	if _, err := enddir.ReadFrom(r.r); err != nil {
 		return err
 	}
+	r.Comment = enddir.Comment
 
 	r.Files = make([]*File, enddir.numberOfEntries)
 	if _, err := r.r.Seek(int64(enddir.offsetCentralDirectory), io.SeekStart); err != nil {
@@ -47,11 +49,7 @@ func (r *Reader) init() error {
 		if _, err := cdir.ReadFrom(r.r); err != nil {
 			return err
 		}
-		r.Files[i] = &File{
-			localFileHeader: cdir.localFileHeader,
-			r:               r.r,
-			cdir:            cdir,
-		}
+		r.Files[i] = newFile(r.r, cdir)
 	}
 
 	return nil
@@ -60,8 +58,18 @@ func (r *Reader) init() error {
 type File struct {
 	localFileHeader
 
-	r    io.ReadSeeker
-	cdir *centralDirectoryHeader
+	r       io.ReadSeeker
+	cdir    *centralDirectoryHeader
+	Comment string
+}
+
+func newFile(r io.ReadSeeker, cdir *centralDirectoryHeader) *File {
+	return &File{
+		localFileHeader: cdir.localFileHeader,
+		r:               r,
+		cdir:            cdir,
+		Comment:         cdir.Comment,
+	}
 }
 
 func (f *File) Open() (io.ReadCloser, error) {

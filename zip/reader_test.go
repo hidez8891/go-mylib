@@ -9,11 +9,13 @@ import (
 )
 
 type testcase struct {
-	path     string
-	filename string
-	content  string
-	flags    uint16
-	mtime    time.Time
+	path       string
+	filename   string
+	content    string
+	comment    string
+	flags      uint16
+	mtime      time.Time
+	zipcomment string
 }
 
 var tests = map[string]testcase{
@@ -37,6 +39,15 @@ var tests = map[string]testcase{
 		content:  "Hello World!",
 		flags:    FlagDataDescriptor,
 		mtime:    time.Date(2022, time.Month(5), 6, 12, 34, 56, 0, time.UTC),
+	},
+	"comment": {
+		path:       "test-comment.zip",
+		filename:   "test.txt",
+		content:    "Hello World!",
+		comment:    "file comment",
+		flags:      0,
+		mtime:      time.Date(2022, time.Month(5), 6, 12, 34, 56, 0, time.UTC),
+		zipcomment: "zip comment",
 	},
 }
 
@@ -68,6 +79,9 @@ func testcaseCompare(t *testing.T, r io.ReadSeeker, tt testcase) {
 	if len(zr.Files) != 1 {
 		t.Fatalf("Reader.Files size=%d, want=%d", len(zr.Files), 1)
 	}
+	if zr.Comment != tt.zipcomment {
+		t.Errorf("zip comment get %q, want %q", zr.Comment, tt.zipcomment)
+	}
 
 	f := zr.Files[0]
 	if f.FileName != tt.filename {
@@ -78,6 +92,9 @@ func testcaseCompare(t *testing.T, r io.ReadSeeker, tt testcase) {
 	}
 	if f.Flags != tt.flags {
 		t.Errorf("Flags get %x, want %x", f.Flags, tt.flags)
+	}
+	if f.Comment != tt.comment {
+		t.Errorf("Comment get %q, want %q", f.Comment, tt.comment)
 	}
 
 	fr, err := f.Open()
