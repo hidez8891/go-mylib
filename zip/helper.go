@@ -1,7 +1,6 @@
 package zip
 
 import (
-	"errors"
 	"io"
 )
 
@@ -46,22 +45,4 @@ func (w *CountWriter) Write(p []byte) (int, error) {
 	n, err := w.w.Write(p)
 	w.Count += n
 	return n, err
-}
-
-type MultiWriter struct {
-	ws []io.Writer
-}
-
-func (mw *MultiWriter) Write(p []byte) (int, error) {
-	wsize := len(p)
-	for _, w := range mw.ws {
-		n, err := w.Write(p)
-		if err != nil {
-			return n, err
-		}
-		if n != wsize {
-			return n, errors.New("write small data")
-		}
-	}
-	return wsize, nil
 }

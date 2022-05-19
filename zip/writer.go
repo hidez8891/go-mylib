@@ -231,12 +231,10 @@ func (fw *FileWriter) writeInit() error {
 	fw.uncompCounter = &CountWriter{w: fw.compWriter}
 	fw.crc32 = crc32.NewIEEE()
 
-	fw.fw = &MultiWriter{
-		[]io.Writer{
-			fw.uncompCounter,
-			fw.crc32,
-		},
-	}
+	fw.fw = io.MultiWriter(
+		fw.uncompCounter,
+		fw.crc32,
+	)
 
 	return fw.writeFileHeader()
 }
