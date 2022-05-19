@@ -10,46 +10,48 @@ import (
 )
 
 const (
-	signLocalFileHeader        string = "PK\x03\x04"
-	signCentralDirectoryHeader string = "PK\x01\x02"
-	signDataDescriptor         string = "PK\x07\x08"
-	signEndCentralDirectory    string = "PK\x05\x06"
+	signLocalFileHeader        string = "PK\x03\x04" // signature of a local file header
+	signCentralDirectoryHeader string = "PK\x01\x02" // signature of a central directory header
+	signDataDescriptor         string = "PK\x07\x08" // signature of a data descriptor
+	signEndCentralDirectory    string = "PK\x05\x06" // signature of an end of central directory record
 
-	sizeLocalFileHeader        int = 30
-	sizeCentralDirectoryHeader int = 46
-	sizeDataDescriptor         int = 16
-	sizeEndCentralDirectory    int = 22
+	sizeLocalFileHeader        int = 30 // size of a local file header
+	sizeCentralDirectoryHeader int = 46 // size of a central directory header
+	sizeDataDescriptor         int = 16 // size of a data descriptor
+	sizeEndCentralDirectory    int = 22 // size of an end of central directory record
 )
 
 const (
-	FlagDataDescriptor uint16 = 0x0008
-	FlagUTF8           uint16 = 0x0800
+	FlagDataDescriptor uint16 = 0x0008 // flags for data descriptor
+	FlagUTF8           uint16 = 0x0800 // flags for UTF-8
 )
 
 const (
-	MethodStored   uint16 = 0
-	MethodDeflated uint16 = 8
+	MethodStored   uint16 = 0 // method ID for Store (raw)
+	MethodDeflated uint16 = 8 // method ID for Deflate
 )
 
 const (
-	MadeByMSDOS uint16 = 0x0000 // MS-DOS and OS/2 (FAT, FAT32)
-	MadeByUNIX  uint16 = 0x0300 // UNIX
-	MadeByNEFS  uint16 = 0x0a00 // Windows NTFS
-	MadeByOSX   uint16 = 0x1300 // OS X
+	MadeByMSDOS uint16 = 0x0000 // version for MS-DOS and OS/2 (FAT, FAT32)
+	MadeByUNIX  uint16 = 0x0300 // version for UNIX
+	MadeByNEFS  uint16 = 0x0a00 // version for Windows NTFS
+	MadeByOSX   uint16 = 0x1300 // version for OS X
 )
 
+// localFileHeader represents a local file header in the ZIP specification.
 type localFileHeader struct {
-	RequireVersion   uint16
-	Flags            uint16
-	Method           uint16
-	ModifiedTime     time.Time
-	CRC32            uint32
-	CompressedSize   uint32
-	UncompressedSize uint32
-	FileName         string
-	ExtraFields      []byte
+	RequireVersion   uint16    // version needed to extract
+	Flags            uint16    // general purpose bit flag
+	Method           uint16    // compression method
+	ModifiedTime     time.Time // last modified file date/time
+	CRC32            uint32    // CRC-32 for uncompressed data
+	CompressedSize   uint32    // compressed data size
+	UncompressedSize uint32    // uncompressed data size
+	FileName         string    // file name
+	ExtraFields      []byte    // extra field data
 }
 
+// ReadFrom reads a local file header from io.Reader.
 func (h *localFileHeader) ReadFrom(r io.Reader) (int64, error) {
 	var sign [4]byte
 	if _, err := r.Read(sign[:]); err != nil {
@@ -99,6 +101,7 @@ func (h *localFileHeader) ReadFrom(r io.Reader) (int64, error) {
 	return int64(sizeLocalFileHeader) + int64(nameSize) + int64(extraSize), nil
 }
 
+// WriteTo writes a local file header to io.Writer.
 func (h *localFileHeader) WriteTo(w io.Writer) (int64, error) {
 	buf := new(bytes.Buffer)
 	buf.Write([]byte(signLocalFileHeader))
@@ -131,15 +134,17 @@ func (h *localFileHeader) WriteTo(w io.Writer) (int64, error) {
 	return int64(n), err
 }
 
+// centralDirectoryHeader represents a central directory header in the ZIP specification.
 type centralDirectoryHeader struct {
 	localFileHeader
-	GenerateVersion   uint16
-	InternalFileAttr  uint16
-	ExternalFileAttr  uint32
-	LocalHeaderOffset uint32
-	Comment           string
+	GenerateVersion   uint16 // version made by
+	InternalFileAttr  uint16 // internal file attributes
+	ExternalFileAttr  uint32 // external file attributes
+	LocalHeaderOffset uint32 // relative offset of local header
+	Comment           string // file comment
 }
 
+// ReadFrom reads a central directory header from io.Reader.
 func (h *centralDirectoryHeader) ReadFrom(r io.Reader) (int64, error) {
 	var sign [4]byte
 	if _, err := r.Read(sign[:]); err != nil {
@@ -210,6 +215,7 @@ func (h *centralDirectoryHeader) ReadFrom(r io.Reader) (int64, error) {
 	return int64(size), nil
 }
 
+// WriteTo writes a central directory header to io.Writer.
 func (h *centralDirectoryHeader) WriteTo(w io.Writer) (int64, error) {
 	buf := new(bytes.Buffer)
 	w.Write([]byte(signCentralDirectoryHeader))
@@ -254,12 +260,14 @@ func (h *centralDirectoryHeader) WriteTo(w io.Writer) (int64, error) {
 	return int64(n), err
 }
 
+// dataDescriptor represents a data descriptor in the ZIP specification.
 type dataDescriptor struct {
-	CRC32            uint32
-	CompressedSize   uint32
-	UncompressedSize uint32
+	CRC32            uint32 // CRC-32 for uncompressed data
+	CompressedSize   uint32 // compressed data size
+	UncompressedSize uint32 // uncompressed data size
 }
 
+// ReadFrom reads a data descriptor from io.Reader.
 func (d *dataDescriptor) ReadFrom(r io.Reader) (int64, error) {
 	var buf [sizeDataDescriptor]byte
 	size := len(buf) - 4
@@ -290,6 +298,7 @@ func (d *dataDescriptor) ReadFrom(r io.Reader) (int64, error) {
 	return int64(size), nil
 }
 
+// WriteTo writes a data descriptor to io.Writer.
 func (d *dataDescriptor) WriteTo(w io.Writer) (int64, error) {
 	buf := new(bytes.Buffer)
 	buf.Write([]byte(signDataDescriptor))
@@ -303,13 +312,15 @@ func (d *dataDescriptor) WriteTo(w io.Writer) (int64, error) {
 	return int64(buf.Len()), nil
 }
 
+// endCentralDirectory represents an end of central directory record in the ZIP specification.
 type endCentralDirectory struct {
-	numberOfEntries          uint16
-	sizeOfCentralDirectories uint32
-	offsetCentralDirectory   uint32
-	Comment                  string
+	numberOfEntries          uint16 // total number of entries in the central directory on this disk
+	sizeOfCentralDirectories uint32 // size of the central directory block
+	offsetCentralDirectory   uint32 // offset of start of central directory with respect to the starting disk number
+	Comment                  string // zip archive comment
 }
 
+// ReadFrom reads an end of central directory record from io.Reader.
 func (e *endCentralDirectory) ReadFrom(r io.Reader) (int64, error) {
 	var sign [4]byte
 	if _, err := r.Read(sign[:]); err != nil {
@@ -354,6 +365,7 @@ func (e *endCentralDirectory) ReadFrom(r io.Reader) (int64, error) {
 	return int64(size), nil
 }
 
+// WriteTo writes an end of central directory record to io.Writer.
 func (e *endCentralDirectory) WriteTo(w io.Writer) (int64, error) {
 	buf := new(bytes.Buffer)
 	w.Write([]byte(signEndCentralDirectory))
@@ -375,6 +387,7 @@ func (e *endCentralDirectory) WriteTo(w io.Writer) (int64, error) {
 	return int64(buf.Len()), nil
 }
 
+// uint32ToUTCTime converts a date/time in uint32 format to time.Time format.
 func uint32ToUTCTime(dates uint16, times uint16) time.Time {
 	year := int((dates >> 9) & 0x7f)
 	monh := int((dates >> 5) & 0x0f)
@@ -389,6 +402,7 @@ func uint32ToUTCTime(dates uint16, times uint16) time.Time {
 	return time.Date(year, time.Month(monh), days, hour, mins, secs, 0, time.UTC)
 }
 
+// utcTimeToUint32 converts time.Time format to uint32 format date/time.
 func utcTimeToUint32(t time.Time) (dates uint16, times uint16) {
 	t = t.UTC()
 	dates |= (uint16(t.Year()) - 1980) << 9

@@ -7,6 +7,7 @@ import (
 	"math"
 )
 
+// Reader reads a zip file.
 type Reader struct {
 	r io.ReadSeeker
 
@@ -14,6 +15,7 @@ type Reader struct {
 	Comment string
 }
 
+// NewWriter returns zip.Reader that reads from io.ReadSeeker.
 func NewReader(r io.ReadSeeker) (*Reader, error) {
 	zr := &Reader{
 		r: r,
@@ -25,6 +27,7 @@ func NewReader(r io.ReadSeeker) (*Reader, error) {
 	return zr, nil
 }
 
+// init parses all data in zip archive.
 func (r *Reader) init() error {
 	offset, err := findEndCentralDirectory(r.r)
 	if err != nil {
@@ -55,6 +58,7 @@ func (r *Reader) init() error {
 	return nil
 }
 
+// File represents a single file in zip archive.
 type File struct {
 	localFileHeader
 
@@ -63,6 +67,7 @@ type File struct {
 	Comment string
 }
 
+// newFile returns zip.File that reads from io.ReadSeeker.
 func newFile(r io.ReadSeeker, cdir *centralDirectoryHeader) *File {
 	return &File{
 		localFileHeader: cdir.localFileHeader,
@@ -72,6 +77,7 @@ func newFile(r io.ReadSeeker, cdir *centralDirectoryHeader) *File {
 	}
 }
 
+// Open returns io.ReadCloser, which reads from the decompressed contents.
 func (f *File) Open() (io.ReadCloser, error) {
 	r, err := f.OpenRaw()
 	if err != nil {
@@ -86,6 +92,7 @@ func (f *File) Open() (io.ReadCloser, error) {
 	return decomp(r), nil
 }
 
+// Open returns io.ReadCloser, which reads from the compressed contents.
 func (f *File) OpenRaw() (io.ReadCloser, error) {
 	if _, err := f.r.Seek(int64(f.cdir.LocalHeaderOffset), io.SeekStart); err != nil {
 		return nil, err
@@ -104,6 +111,7 @@ func (f *File) OpenRaw() (io.ReadCloser, error) {
 	return &nopReadCloser{r}, nil
 }
 
+// findEndCentralDirectory returns the offset of the EndCentralDirectory in io.ReadSeeker.
 func findEndCentralDirectory(r io.ReadSeeker) (offset int64, err error) {
 	// get size
 	startOffset, err := r.Seek(0, io.SeekStart)

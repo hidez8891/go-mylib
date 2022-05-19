@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// Writer creates a zip file.
 type Writer struct {
 	w    io.WriteSeeker
 	dirs []*centralDirectoryHeader
@@ -18,6 +19,7 @@ type Writer struct {
 	Comment string
 }
 
+// NewWriter returns zip.Writer that writes to io.WriteSeeker.
 func NewWriter(w io.WriteSeeker) (*Writer, error) {
 	return &Writer{
 		w:    w,
@@ -25,6 +27,7 @@ func NewWriter(w io.WriteSeeker) (*Writer, error) {
 	}, nil
 }
 
+// Create returns zip.FileWriter that creates a file with name.
 func (w *Writer) Create(name string) (*FileWriter, error) {
 	namesize := len(name)
 	if strings.HasSuffix(name, "/") {
@@ -64,6 +67,7 @@ func (w *Writer) Create(name string) (*FileWriter, error) {
 	}, nil
 }
 
+// Close flushes the write data and closes zip.Writer.
 func (w *Writer) Close() error {
 	return w.writeCentralDirectories()
 }
@@ -98,6 +102,7 @@ func (w *Writer) writeCentralDirectories() error {
 	return nil
 }
 
+// FileWriter implements a io.Writer that compresses and writes data.
 type FileWriter struct {
 	w io.WriteSeeker // raw Writer
 	h *centralDirectoryHeader
@@ -112,6 +117,7 @@ type FileWriter struct {
 	Comment string
 }
 
+// newFileWriter returns zip.FileWriter that writes to io.WriteSeeker.
 func newFileWriter(w io.WriteSeeker, h *centralDirectoryHeader) *FileWriter {
 	return &FileWriter{
 		w: w,
@@ -119,10 +125,13 @@ func newFileWriter(w io.WriteSeeker, h *centralDirectoryHeader) *FileWriter {
 	}
 }
 
+// Flags returns the current flags.
 func (fw *FileWriter) Flags() uint16 {
 	return fw.h.Flags
 }
 
+// SetFlag sets additional flags.
+// This function should not be called after writing data.
 func (fw *FileWriter) SetFlags(flags uint16) error {
 	if fw.initialized {
 		return errors.New("operation is invalid after writing")
@@ -131,6 +140,8 @@ func (fw *FileWriter) SetFlags(flags uint16) error {
 	return nil
 }
 
+// UnsetFlag clears the specified flags.
+// This function should not be called after writing data.
 func (fw *FileWriter) UnsetFlags(flags uint16) error {
 	if fw.initialized {
 		return errors.New("operation is invalid after writing")
@@ -139,14 +150,18 @@ func (fw *FileWriter) UnsetFlags(flags uint16) error {
 	return nil
 }
 
+// Name returns the file name.
 func (fw *FileWriter) Name() string {
 	return fw.h.FileName
 }
 
+// Method returns the method ID of the data compression mode.
 func (fw *FileWriter) Method() uint16 {
 	return fw.h.Method
 }
 
+// SetMethod updates the method ID of the data compression mode.
+// This function should not be called after writing data.
 func (fw *FileWriter) SetMethod(methodID uint16) error {
 	if strings.HasSuffix(fw.h.FileName, "/") {
 		return errors.New("directory path does not allow Method update")
@@ -158,10 +173,13 @@ func (fw *FileWriter) SetMethod(methodID uint16) error {
 	return nil
 }
 
+// ModifiedTime returns the modified time.
 func (fw *FileWriter) ModifiedTime() time.Time {
 	return fw.h.ModifiedTime
 }
 
+// SetModifiedTime updates the modified time.
+// This function should not be called after writing data.
 func (fw *FileWriter) SetModifiedTime(t time.Time) error {
 	if fw.initialized {
 		return errors.New("operation is invalid after writing")
@@ -170,6 +188,7 @@ func (fw *FileWriter) SetModifiedTime(t time.Time) error {
 	return nil
 }
 
+// Write compresses and writes []byte.
 func (fw *FileWriter) Write(p []byte) (int, error) {
 	if !fw.initialized {
 		fw.writeInit()
@@ -178,6 +197,8 @@ func (fw *FileWriter) Write(p []byte) (int, error) {
 	return fw.fw.Write(p)
 }
 
+// Close flushes the write data and closes zip.FileWriter.
+// If FlagDataDescriptor is not set, the file header is rewritten.
 func (fw *FileWriter) Close() error {
 	if fw.initialized {
 		if err := fw.compWriter.Close(); err != nil {
@@ -196,6 +217,7 @@ func (fw *FileWriter) Close() error {
 	}
 }
 
+// writeInit performs the preprocessing for writing and write the file header.
 func (fw *FileWriter) writeInit() error {
 	fw.initialized = true
 
@@ -219,11 +241,13 @@ func (fw *FileWriter) writeInit() error {
 	return fw.writeFileHeader()
 }
 
+// writeFileHeader writes the file header.
 func (fw *FileWriter) writeFileHeader() error {
 	_, err := fw.h.localFileHeader.WriteTo(fw.w)
 	return err
 }
 
+// writeDataDescriptor writes the data descriptor.
 func (fw *FileWriter) writeDataDescriptor() error {
 	dd := new(dataDescriptor)
 	dd.CRC32 = fw.h.CRC32
@@ -234,6 +258,7 @@ func (fw *FileWriter) writeDataDescriptor() error {
 	return err
 }
 
+// rewriteFileHeader rewrites the file header.
 func (fw *FileWriter) rewriteFileHeader() error {
 	current, err := fw.w.Seek(0, io.SeekCurrent)
 	if err != nil {
