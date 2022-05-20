@@ -52,7 +52,7 @@ func (s *Slice[T]) Resize(len int) {
 	}
 }
 
-// At returns the i-th elemen.
+// At returns the i-th element.
 func (s *Slice[T]) At(i int) T {
 	return s.s[i]
 }
