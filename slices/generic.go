@@ -22,7 +22,7 @@ func (s *Slice[T]) Len() int {
 	return len(s.s)
 }
 
-// Shrink reduces the capacity to `cap`.
+// Shrink reduces the capacity to 'cap'.
 func (s *Slice[T]) Shrink(cap int) {
 	size := s.Len()
 	if cap-size > 0 {
@@ -32,7 +32,7 @@ func (s *Slice[T]) Shrink(cap int) {
 	}
 }
 
-// Reserve extends the capacity to `cap`.
+// Reserve extends the capacity to 'cap'.
 func (s *Slice[T]) Reserve(cap int) {
 	size := s.Len()
 	n := cap - size
@@ -41,7 +41,7 @@ func (s *Slice[T]) Reserve(cap int) {
 	}
 }
 
-// Resize changes the number of elements to `len`.
+// Resize changes the number of elements to 'len'.
 func (s *Slice[T]) Resize(len int) {
 	size := s.Len()
 	n := len - size
@@ -57,18 +57,18 @@ func (s *Slice[T]) At(i int) T {
 	return s.s[i]
 }
 
-// Set sets `v` to the i-th element.
+// Set sets 'v' to the i-th element.
 func (s *Slice[T]) Set(i int, v T) {
 	s.s[i] = v
 }
 
-// Insert inserts `v` into the i-th element.
+// Insert inserts 'v' into the i-th element.
 func (s *Slice[T]) Insert(i int, v T) {
 	s.s = append(s.s[:i+1], s.s[i:]...)
 	s.s[i] = v
 }
 
-// Append appends `v` to the end of the slice.
+// Append appends 'v' to the end of the slice.
 func (s *Slice[T]) Append(v T) {
 	s.s = append(s.s, v)
 }
@@ -84,7 +84,7 @@ func (s *Slice[T]) Delete(i int) {
 	s.s = s.s[:len(s.s)-1]
 }
 
-// Erase deletes elements from `begin` to `end - 1`.
+// Erase deletes elements from 'begin' to 'end - 1'.
 func (s *Slice[T]) Erase(begin int, end int) {
 	n := s.Len() - (end - begin)
 	copy(s.s[begin:], s.s[end:])
@@ -105,7 +105,7 @@ func (s *Slice[T]) Clone() *Slice[T] {
 	}
 }
 
-// Sub returns a reference to an Slice from `begin` to `end - 1`.
+// Sub returns a reference to an Slice from 'begin' to 'end - 1'.
 func (s *Slice[T]) Sub(begin int, end int) *Slice[T] {
 	return &Slice[T]{
 		s: s.s[begin:end],
