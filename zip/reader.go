@@ -89,7 +89,7 @@ func (f *File) Open() (io.ReadCloser, error) {
 		return nil, errors.New("Unsupport decompress method")
 	}
 
-	return decomp(r), nil
+	return decomp(r, f.Flags), nil
 }
 
 // Open returns io.ReadCloser, which reads from the compressed contents.

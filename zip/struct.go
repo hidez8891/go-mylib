@@ -24,6 +24,11 @@ const (
 const (
 	FlagDataDescriptor uint16 = 0x0008 // flags for data descriptor
 	FlagUTF8           uint16 = 0x0800 // flags for UTF-8
+
+	FlagDeflateDefaultCompression   uint16 = 0x00 << 1 // deflate: default compression
+	FlagDeflateMaximumCompression   uint16 = 0x01 << 1 // deflate: maximum compression
+	FlagDeflateFastCompression      uint16 = 0x02 << 1 // deflate: fast compression
+	FlagDeflateSuperFastCompression uint16 = 0x03 << 1 // deflate: super fast compression
 )
 
 const (

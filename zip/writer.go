@@ -227,7 +227,7 @@ func (fw *FileWriter) writeInit() error {
 	}
 
 	fw.compCounter = &CountWriter{w: fw.w}
-	fw.compWriter = comp(fw.compCounter)
+	fw.compWriter = comp(fw.compCounter, fw.h.Flags)
 	fw.uncompCounter = &CountWriter{w: fw.compWriter}
 	fw.crc32 = crc32.NewIEEE()
 
