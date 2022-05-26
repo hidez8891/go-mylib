@@ -15,6 +15,7 @@ import (
 type Writer struct {
 	w    io.WriteSeeker
 	dirs []*centralDirectoryHeader
+	pre  *FileWriter
 
 	Comment string
 }
@@ -28,7 +29,12 @@ func NewWriter(w io.WriteSeeker) (*Writer, error) {
 }
 
 // Create returns zip.FileWriter that creates a file with name.
+// If the previous FileWriter has not called Close, it is forced to close.
 func (w *Writer) Create(name string) (*FileWriter, error) {
+	if err := w.closePreviousFile(); err != nil {
+		return nil, err
+	}
+
 	namesize := len(name)
 	if strings.HasSuffix(name, "/") {
 		namesize -= 1
@@ -61,17 +67,34 @@ func (w *Writer) Create(name string) (*FileWriter, error) {
 
 	w.dirs = append(w.dirs, h)
 
-	return &FileWriter{
+	fw := &FileWriter{
 		w: w.w,
 		h: h,
-	}, nil
+	}
+	w.pre = fw
+
+	return fw, nil
 }
 
 // Close flushes the write data and closes zip.Writer.
+// If the previous FileWriter has not called Close, it is forced to close.
 func (w *Writer) Close() error {
+	if err := w.closePreviousFile(); err != nil {
+		return err
+	}
 	return w.writeCentralDirectories()
 }
 
+// closePreviousFile closes the previous FileWriter.
+func (w *Writer) closePreviousFile() (err error) {
+	if w.pre != nil && !w.pre.IsClosed() {
+		err = w.pre.Close()
+		w.pre = nil
+	}
+	return err
+}
+
+// writeCentralDirectories writes central directory headers.
 func (w *Writer) writeCentralDirectories() error {
 	startOffset, err := w.w.Seek(0, io.SeekCurrent)
 	if err != nil {
@@ -113,6 +136,7 @@ type FileWriter struct {
 	crc32         hash.Hash32    // hash calclator
 	fw            io.Writer      // file data Writer
 	initialized   bool
+	closed        bool
 
 	Comment string
 }
@@ -200,6 +224,11 @@ func (fw *FileWriter) Write(p []byte) (int, error) {
 // Close flushes the write data and closes zip.FileWriter.
 // If FlagDataDescriptor is not set, the file header is rewritten.
 func (fw *FileWriter) Close() error {
+	if fw.closed {
+		return errors.New("already closed")
+	}
+	fw.closed = true
+
 	if fw.initialized {
 		if err := fw.compWriter.Close(); err != nil {
 			return err
@@ -215,6 +244,11 @@ func (fw *FileWriter) Close() error {
 	} else {
 		return fw.rewriteFileHeader()
 	}
+}
+
+// IsClosed returns whether the FileWriter is closed.
+func (fw *FileWriter) IsClosed() bool {
+	return fw.closed
 }
 
 // writeInit performs the preprocessing for writing and write the file header.
