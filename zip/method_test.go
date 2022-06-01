@@ -34,10 +34,10 @@ func TestMethodDeflate(t *testing.T) {
 	expect := "Hello"
 
 	levels := []uint16{
-		FlagDeflateDefaultCompression,
-		FlagDeflateMaximumCompression,
-		FlagDeflateFastCompression,
-		FlagDeflateSuperFastCompression,
+		0x00 << 1,
+		0x01 << 1,
+		0x02 << 1,
+		0x03 << 1,
 	}
 
 	for _, level := range levels {

@@ -46,7 +46,7 @@ func newStoreReader(r io.Reader, _ uint16) io.ReadCloser {
 // newStoreWrite returns deflate compression writer.
 func newDeflateWriter(w io.Writer, option uint16) io.WriteCloser {
 	var level int
-	switch option & 0x03 {
+	switch (option >> 1) & 0x03 {
 	case 0x00:
 		level = flate.DefaultCompression
 	case 0x01:
