@@ -22,38 +22,144 @@ const (
 )
 
 const (
-	FlagDataDescriptor uint16 = 0x0008 // flags for data descriptor
-	FlagUTF8           uint16 = 0x0800 // flags for UTF-8
-
-	FlagDeflateDefaultCompression   uint16 = 0x00 << 1 // deflate: default compression
-	FlagDeflateMaximumCompression   uint16 = 0x01 << 1 // deflate: maximum compression
-	FlagDeflateFastCompression      uint16 = 0x02 << 1 // deflate: fast compression
-	FlagDeflateSuperFastCompression uint16 = 0x03 << 1 // deflate: super fast compression
-)
-
-const (
-	MethodStored   uint16 = 0 // method ID for Store (raw)
-	MethodDeflated uint16 = 8 // method ID for Deflate
-)
-
-const (
 	MadeByMSDOS uint16 = 0x0000 // version for MS-DOS and OS/2 (FAT, FAT32)
 	MadeByUNIX  uint16 = 0x0300 // version for UNIX
 	MadeByNEFS  uint16 = 0x0a00 // version for Windows NTFS
 	MadeByOSX   uint16 = 0x1300 // version for OS X
 )
 
+const (
+	flagDataDescriptor uint16 = 0x0008 // flag for data descriptor
+	flagUTF8           uint16 = 0x0800 // flag for UTF-8
+)
+
+// FlagType represents flags of a zip header.
+type FlagType struct {
+	DataDescriptor bool
+	UTF8           bool
+}
+
+// set sets FlagType from a zip header's flags.
+func (f *FlagType) set(flag uint16) error {
+	f.DataDescriptor = flag&flagDataDescriptor != 0
+	f.UTF8 = flag&flagUTF8 != 0
+	return nil
+}
+
+// get returns a zip header's flags.
+func (f *FlagType) get() (flag uint16) {
+	if f.DataDescriptor {
+		flag |= flagDataDescriptor
+	}
+	if f.UTF8 {
+		flag |= flagUTF8
+	}
+	return flag
+}
+
+// MethodType represents a compression method.
+type MethodType interface {
+	ID() uint16
+	set(flag uint16) error
+	get() uint16
+}
+
+const (
+	methodStoreID    uint16 = 0x00 // method ID for storing original file
+	methodDeflatedID uint16 = 0x08 // method ID for deflating
+)
+
+// methodFactory returns a MethodType from a method ID.
+func methodFactory(method uint16) (MethodType, error) {
+	switch method {
+	case methodStoreID:
+		return &MethodStore{}, nil
+	case methodDeflatedID:
+		return &MethodDeflated{DefaultCompression}, nil
+	}
+	return nil, errors.New("unsupport compression method")
+}
+
+// CompressionType represents a compression level.
+type CompressionType int
+
+const (
+	DefaultCompression   CompressionType = iota // default level compression
+	MaximumCompression                          // maximum compression
+	FastCompression                             // fast compression
+	SuperFastCompression                        // super fast compression
+)
+
+// MethodStore is a compression method for storing data.
+type MethodStore struct {
+}
+
+// ID returns a compression method's ID.
+func (MethodStore) ID() uint16 {
+	return methodStoreID
+}
+
+// set sets method options from a zip header's flags.
+func (MethodStore) set(flag uint16) error {
+	return nil
+}
+
+// get returns method options in zip header's flag format.
+func (MethodStore) get() uint16 {
+	return 0x00
+}
+
+// MethodDeflated is a compression method for deflate.
+type MethodDeflated struct {
+	Compression CompressionType
+}
+
+// ID returns a compression method's ID.
+func (MethodDeflated) ID() uint16 {
+	return methodDeflatedID
+}
+
+// set sets method options from a zip header's flags.
+func (m *MethodDeflated) set(flag uint16) error {
+	switch (flag >> 1) & 0x03 {
+	case 0x00:
+		m.Compression = DefaultCompression
+	case 0x01:
+		m.Compression = MaximumCompression
+	case 0x02:
+		m.Compression = FastCompression
+	case 0x03:
+		m.Compression = SuperFastCompression
+	}
+	return nil
+}
+
+// get returns method options in zip header's flag format.
+func (m MethodDeflated) get() uint16 {
+	switch m.Compression {
+	case DefaultCompression:
+		return 0x00 << 1
+	case MaximumCompression:
+		return 0x01 << 1
+	case FastCompression:
+		return 0x02 << 1
+	case SuperFastCompression:
+		return 0x03 << 1
+	}
+	return 0 // never reach
+}
+
 // localFileHeader represents a local file header in the ZIP specification.
 type localFileHeader struct {
-	RequireVersion   uint16    // version needed to extract
-	Flags            uint16    // general purpose bit flag
-	Method           uint16    // compression method
-	ModifiedTime     time.Time // last modified file date/time
-	CRC32            uint32    // CRC-32 for uncompressed data
-	CompressedSize   uint32    // compressed data size
-	UncompressedSize uint32    // uncompressed data size
-	FileName         string    // file name
-	ExtraFields      []byte    // extra field data
+	RequireVersion   uint16     // version needed to extract
+	Flags            FlagType   // general purpose bit flag
+	Method           MethodType // compression method
+	ModifiedTime     time.Time  // last modified file date/time
+	CRC32            uint32     // CRC-32 for uncompressed data
+	CompressedSize   uint32     // compressed data size
+	UncompressedSize uint32     // uncompressed data size
+	FileName         string     // file name
+	ExtraFields      []byte     // extra field data
 }
 
 // ReadFrom reads a local file header from io.Reader.
@@ -71,20 +177,35 @@ func (h *localFileHeader) ReadFrom(r io.Reader) (int64, error) {
 		return 0, err
 	}
 
+	var (
+		flag      uint16
+		method    uint16
+		modtime   uint16
+		moddate   uint16
+		nameSize  uint16
+		extraSize uint16
+	)
 	rr := bytes.NewReader(data[:])
 	byteio.GetUint16LE(rr, &h.RequireVersion)
-	byteio.GetUint16LE(rr, &h.Flags)
-	byteio.GetUint16LE(rr, &h.Method)
-	var modtime, moddate uint16
+	byteio.GetUint16LE(rr, &flag)
+	byteio.GetUint16LE(rr, &method)
 	byteio.GetUint16LE(rr, &modtime)
 	byteio.GetUint16LE(rr, &moddate)
-	h.ModifiedTime = uint32ToUTCTime(moddate, modtime)
 	byteio.GetUint32LE(rr, &h.CRC32)
 	byteio.GetUint32LE(rr, &h.CompressedSize)
 	byteio.GetUint32LE(rr, &h.UncompressedSize)
-	var nameSize, extraSize uint16
 	byteio.GetUint16LE(rr, &nameSize)
 	byteio.GetUint16LE(rr, &extraSize)
+
+	if m, err := methodFactory(method); err != nil {
+		return 0, err
+	} else {
+		h.Method = m
+	}
+
+	h.Flags.set(flag)
+	h.Method.set(flag)
+	h.ModifiedTime = uint32ToUTCTime(moddate, modtime)
 
 	if nameSize == 0 {
 		return 0, errors.New("invalid file name: name length is 0")
@@ -108,12 +229,16 @@ func (h *localFileHeader) ReadFrom(r io.Reader) (int64, error) {
 
 // WriteTo writes a local file header to io.Writer.
 func (h *localFileHeader) WriteTo(w io.Writer) (int64, error) {
+	flag := h.Flags.get()
+	flag |= h.Method.get()
+	method := h.Method.ID()
+	moddate, modtime := utcTimeToUint32(h.ModifiedTime)
+
 	buf := new(bytes.Buffer)
 	buf.Write([]byte(signLocalFileHeader))
 	byteio.WriteUint16LE(buf, h.RequireVersion)
-	byteio.WriteUint16LE(buf, h.Flags)
-	byteio.WriteUint16LE(buf, h.Method)
-	moddate, modtime := utcTimeToUint32(h.ModifiedTime)
+	byteio.WriteUint16LE(buf, flag)
+	byteio.WriteUint16LE(buf, method)
 	byteio.WriteUint16LE(buf, modtime)
 	byteio.WriteUint16LE(buf, moddate)
 	byteio.WriteUint32LE(buf, h.CRC32)
@@ -164,27 +289,43 @@ func (h *centralDirectoryHeader) ReadFrom(r io.Reader) (int64, error) {
 		return 0, err
 	}
 
+	var (
+		flag        uint16
+		method      uint16
+		modtime     uint16
+		moddate     uint16
+		nameSize    uint16
+		extraSize   uint16
+		commentSize uint16
+		diskNumber  uint16
+	)
 	rr := bytes.NewReader(data[:])
 	byteio.GetUint16LE(rr, &h.GenerateVersion)
 	byteio.GetUint16LE(rr, &h.RequireVersion)
-	byteio.GetUint16LE(rr, &h.Flags)
-	byteio.GetUint16LE(rr, &h.Method)
-	var modtime, moddate uint16
+	byteio.GetUint16LE(rr, &flag)
+	byteio.GetUint16LE(rr, &method)
 	byteio.GetUint16LE(rr, &modtime)
 	byteio.GetUint16LE(rr, &moddate)
-	h.ModifiedTime = uint32ToUTCTime(moddate, modtime)
 	byteio.GetUint32LE(rr, &h.CRC32)
 	byteio.GetUint32LE(rr, &h.CompressedSize)
 	byteio.GetUint32LE(rr, &h.UncompressedSize)
-	var nameSize, extraSize, commentSize uint16
 	byteio.GetUint16LE(rr, &nameSize)
 	byteio.GetUint16LE(rr, &extraSize)
 	byteio.GetUint16LE(rr, &commentSize)
-	var diskNumber uint16
 	byteio.GetUint16LE(rr, &diskNumber)
 	byteio.GetUint16LE(rr, &h.InternalFileAttr)
 	byteio.GetUint32LE(rr, &h.ExternalFileAttr)
 	byteio.GetUint32LE(rr, &h.LocalHeaderOffset)
+
+	if m, err := methodFactory(method); err != nil {
+		return 0, err
+	} else {
+		h.Method = m
+	}
+
+	h.Flags.set(flag)
+	h.Method.set(flag)
+	h.ModifiedTime = uint32ToUTCTime(moddate, modtime)
 
 	if diskNumber != 0 {
 		return 0, errors.New("unsupport split zip file")
@@ -222,13 +363,17 @@ func (h *centralDirectoryHeader) ReadFrom(r io.Reader) (int64, error) {
 
 // WriteTo writes a central directory header to io.Writer.
 func (h *centralDirectoryHeader) WriteTo(w io.Writer) (int64, error) {
+	flag := h.Flags.get()
+	flag |= h.Method.get()
+	method := h.Method.ID()
+	moddate, modtime := utcTimeToUint32(h.ModifiedTime)
+
 	buf := new(bytes.Buffer)
 	w.Write([]byte(signCentralDirectoryHeader))
 	byteio.WriteUint16LE(buf, h.GenerateVersion)
 	byteio.WriteUint16LE(buf, h.RequireVersion)
-	byteio.WriteUint16LE(buf, h.Flags)
-	byteio.WriteUint16LE(buf, h.Method)
-	moddate, modtime := utcTimeToUint32(h.ModifiedTime)
+	byteio.WriteUint16LE(buf, flag)
+	byteio.WriteUint16LE(buf, method)
 	byteio.WriteUint16LE(buf, modtime)
 	byteio.WriteUint16LE(buf, moddate)
 	byteio.WriteUint32LE(buf, h.CRC32)

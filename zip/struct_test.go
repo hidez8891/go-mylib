@@ -64,8 +64,8 @@ func Test_localFileHeader(t *testing.T) {
 	`)
 	expect := localFileHeader{
 		RequireVersion:   0x0014,
-		Flags:            0x0008,
-		Method:           8,
+		Flags:            FlagType{DataDescriptor: true},
+		Method:           &MethodDeflated{DefaultCompression},
 		ModifiedTime:     time.Date(2022, time.Month(5), 6, 12, 34, 56, 0, time.UTC),
 		CRC32:            0x01020304,
 		CompressedSize:   0x12345678,
@@ -85,11 +85,11 @@ func Test_localFileHeader(t *testing.T) {
 		if h.RequireVersion != expect.RequireVersion {
 			t.Errorf("RequireVersion=%x, want=%x", h.RequireVersion, expect.RequireVersion)
 		}
-		if h.Flags != expect.Flags {
-			t.Errorf("Flags=%x, want=%x", h.Flags, expect.Flags)
+		if h.Flags.get() != expect.Flags.get() {
+			t.Errorf("Flags=%#v, want=%#v", h.Flags, expect.Flags)
 		}
-		if h.Method != expect.Method {
-			t.Errorf("Method=%x, want=%x", h.Method, expect.Method)
+		if h.Method.ID() != expect.Method.ID() || h.Method.get() != expect.Method.get() {
+			t.Errorf("Method=%#v, want=%#v", h.Method, expect.Method)
 		}
 		if !h.ModifiedTime.Equal(expect.ModifiedTime) {
 			t.Errorf("ModifiedTime=%#v, want=%#v", h.ModifiedTime, expect.ModifiedTime)
@@ -146,8 +146,8 @@ func Test_centralDirectoryHeader(t *testing.T) {
 	expect := centralDirectoryHeader{
 		localFileHeader: localFileHeader{
 			RequireVersion:   0x0014,
-			Flags:            0x0008,
-			Method:           8,
+			Flags:            FlagType{DataDescriptor: true},
+			Method:           &MethodDeflated{DefaultCompression},
 			ModifiedTime:     time.Date(2022, time.Month(5), 6, 12, 34, 56, 0, time.UTC),
 			CRC32:            0x01020304,
 			CompressedSize:   0x12345678,
@@ -176,11 +176,11 @@ func Test_centralDirectoryHeader(t *testing.T) {
 		if h.RequireVersion != expect.RequireVersion {
 			t.Errorf("RequireVersion=%x, want=%x", h.RequireVersion, expect.RequireVersion)
 		}
-		if h.Flags != expect.Flags {
-			t.Errorf("Flags=%x, want=%x", h.Flags, expect.Flags)
+		if h.Flags.get() != expect.Flags.get() {
+			t.Errorf("Flags=%v, want=%v", h.Flags, expect.Flags)
 		}
-		if h.Method != expect.Method {
-			t.Errorf("Method=%x, want=%x", h.Method, expect.Method)
+		if h.Method.ID() != expect.Method.ID() || h.Method.get() != expect.Method.get() {
+			t.Errorf("Method=%v, want=%v", h.Method, expect.Method)
 		}
 		if !h.ModifiedTime.Equal(expect.ModifiedTime) {
 			t.Errorf("ModifiedTime=%#v, want=%#v", h.ModifiedTime, expect.ModifiedTime)

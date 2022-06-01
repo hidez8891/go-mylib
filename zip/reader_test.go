@@ -13,7 +13,7 @@ type testcase struct {
 	filename   string
 	content    string
 	comment    string
-	flags      uint16
+	flags      FlagType
 	mtime      time.Time
 	zipcomment string
 }
@@ -23,21 +23,21 @@ var tests = map[string]testcase{
 		path:     "test-dd.zip",
 		filename: "test.txt",
 		content:  "Hello World!",
-		flags:    FlagDataDescriptor,
+		flags:    FlagType{DataDescriptor: true},
 		mtime:    time.Date(2022, time.Month(5), 6, 12, 34, 56, 0, time.UTC),
 	},
 	"no-data-descriptor": {
 		path:     "test-nodd.zip",
 		filename: "test.txt",
 		content:  "Hello World!",
-		flags:    0,
+		flags:    FlagType{},
 		mtime:    time.Date(2022, time.Month(5), 6, 12, 34, 56, 0, time.UTC),
 	},
 	"data-descriptor-without-sign": {
 		path:     "test-dd-nosign.zip",
 		filename: "test.txt",
 		content:  "Hello World!",
-		flags:    FlagDataDescriptor,
+		flags:    FlagType{DataDescriptor: true},
 		mtime:    time.Date(2022, time.Month(5), 6, 12, 34, 56, 0, time.UTC),
 	},
 	"comment": {
@@ -45,7 +45,7 @@ var tests = map[string]testcase{
 		filename:   "test.txt",
 		content:    "Hello World!",
 		comment:    "file comment",
-		flags:      0,
+		flags:      FlagType{},
 		mtime:      time.Date(2022, time.Month(5), 6, 12, 34, 56, 0, time.UTC),
 		zipcomment: "zip comment",
 	},
@@ -90,8 +90,8 @@ func testcaseCompare(t *testing.T, r io.ReadSeeker, tt testcase) {
 	if f.ModifiedTime != tt.mtime {
 		t.Errorf("ModifiedTime get %v, want %v", f.ModifiedTime, tt.mtime)
 	}
-	if f.Flags != tt.flags {
-		t.Errorf("Flags get %x, want %x", f.Flags, tt.flags)
+	if f.Flags.get() != tt.flags.get() {
+		t.Errorf("Flags get %#v, want %#v", f.Flags, tt.flags)
 	}
 	if f.Comment != tt.comment {
 		t.Errorf("Comment get %q, want %q", f.Comment, tt.comment)

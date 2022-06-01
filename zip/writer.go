@@ -51,8 +51,8 @@ func (w *Writer) Create(name string) (*FileWriter, error) {
 	h := &centralDirectoryHeader{
 		localFileHeader: localFileHeader{
 			RequireVersion: 20, // require deflate compression
-			Flags:          0,
-			Method:         MethodDeflated,
+			Flags:          FlagType{},
+			Method:         &MethodDeflated{DefaultCompression},
 			ModifiedTime:   time.Now(),
 			FileName:       name,
 		},
@@ -62,15 +62,12 @@ func (w *Writer) Create(name string) (*FileWriter, error) {
 
 	if strings.HasSuffix(name, "/") {
 		// directory is only allowed Store method
-		h.Method = MethodStored
+		h.Method = &MethodStore{}
 	}
 
 	w.dirs = append(w.dirs, h)
 
-	fw := &FileWriter{
-		w: w.w,
-		h: h,
-	}
+	fw := newFileWriter(w.w, h)
 	w.pre = fw
 
 	return fw, nil
@@ -138,7 +135,10 @@ type FileWriter struct {
 	initialized   bool
 	closed        bool
 
-	Comment string
+	Flags        FlagType   // file flags
+	Method       MethodType // file compression method
+	ModifiedTime time.Time  // file modified time
+	Comment      string     // file comment
 }
 
 // newFileWriter returns zip.FileWriter that writes to io.WriteSeeker.
@@ -146,70 +146,16 @@ func newFileWriter(w io.WriteSeeker, h *centralDirectoryHeader) *FileWriter {
 	return &FileWriter{
 		w: w,
 		h: h,
-	}
-}
 
-// Flags returns the current flags.
-func (fw *FileWriter) Flags() uint16 {
-	return fw.h.Flags
-}
-
-// SetFlag sets additional flags.
-// This function should not be called after writing data.
-func (fw *FileWriter) SetFlags(flags uint16) error {
-	if fw.initialized {
-		return errors.New("operation is invalid after writing")
+		Flags:        h.Flags,
+		Method:       h.Method,
+		ModifiedTime: h.ModifiedTime,
 	}
-	fw.h.Flags |= flags
-	return nil
-}
-
-// UnsetFlag clears the specified flags.
-// This function should not be called after writing data.
-func (fw *FileWriter) UnsetFlags(flags uint16) error {
-	if fw.initialized {
-		return errors.New("operation is invalid after writing")
-	}
-	fw.h.Flags &^= flags
-	return nil
 }
 
 // Name returns the file name.
 func (fw *FileWriter) Name() string {
 	return fw.h.FileName
-}
-
-// Method returns the method ID of the data compression mode.
-func (fw *FileWriter) Method() uint16 {
-	return fw.h.Method
-}
-
-// SetMethod updates the method ID of the data compression mode.
-// This function should not be called after writing data.
-func (fw *FileWriter) SetMethod(methodID uint16) error {
-	if strings.HasSuffix(fw.h.FileName, "/") {
-		return errors.New("directory path does not allow Method update")
-	}
-	if fw.initialized {
-		return errors.New("operation is invalid after writing")
-	}
-	fw.h.Method = methodID
-	return nil
-}
-
-// ModifiedTime returns the modified time.
-func (fw *FileWriter) ModifiedTime() time.Time {
-	return fw.h.ModifiedTime
-}
-
-// SetModifiedTime updates the modified time.
-// This function should not be called after writing data.
-func (fw *FileWriter) SetModifiedTime(t time.Time) error {
-	if fw.initialized {
-		return errors.New("operation is invalid after writing")
-	}
-	fw.h.ModifiedTime = t
-	return nil
 }
 
 // Write compresses and writes []byte.
@@ -239,7 +185,7 @@ func (fw *FileWriter) Close() error {
 		fw.h.Comment = fw.Comment
 	}
 
-	if fw.h.Flags&FlagDataDescriptor != 0 {
+	if fw.h.Flags.DataDescriptor {
 		return fw.writeDataDescriptor()
 	} else {
 		return fw.rewriteFileHeader()
@@ -255,13 +201,17 @@ func (fw *FileWriter) IsClosed() bool {
 func (fw *FileWriter) writeInit() error {
 	fw.initialized = true
 
-	comp, ok := compressors[fw.h.Method]
+	fw.h.Flags = fw.Flags
+	fw.h.Method = fw.Method
+	fw.h.ModifiedTime = fw.ModifiedTime
+
+	comp, ok := compressors[fw.h.Method.ID()]
 	if !ok {
 		return errors.New("Unsupport compress method")
 	}
 
 	fw.compCounter = &CountWriter{w: fw.w}
-	fw.compWriter = comp(fw.compCounter, fw.h.Flags)
+	fw.compWriter = comp(fw.compCounter, fw.h.Method.get())
 	fw.uncompCounter = &CountWriter{w: fw.compWriter}
 	fw.crc32 = crc32.NewIEEE()
 

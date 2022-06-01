@@ -84,12 +84,12 @@ func (f *File) Open() (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	decomp, ok := decompressors[f.cdir.Method]
+	decomp, ok := decompressors[f.cdir.Method.ID()]
 	if !ok {
 		return nil, errors.New("Unsupport decompress method")
 	}
 
-	return decomp(r, f.Flags), nil
+	return decomp(r, f.cdir.Method.get()), nil
 }
 
 // Open returns io.ReadCloser, which reads from the compressed contents.

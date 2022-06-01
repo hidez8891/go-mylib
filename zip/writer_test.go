@@ -35,12 +35,8 @@ func testWriter(t *testing.T, tt testcase) {
 	if err != nil {
 		t.Fatalf("Writer.Create error=%#v", err)
 	}
-	if err := fw.SetFlags(tt.flags); err != nil {
-		t.Fatalf("FileWriter.SetFlags error=%#v", err)
-	}
-	if err := fw.SetModifiedTime(tt.mtime); err != nil {
-		t.Fatalf("FileWriter.SetModifiedTime error=%#v", err)
-	}
+	fw.Flags = tt.flags
+	fw.ModifiedTime = tt.mtime
 	fw.Comment = tt.comment
 
 	if _, err := fw.Write([]byte(tt.content)); err != nil {
