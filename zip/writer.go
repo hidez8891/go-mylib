@@ -199,19 +199,18 @@ func (fw *FileWriter) IsClosed() bool {
 
 // writeInit performs the preprocessing for writing and write the file header.
 func (fw *FileWriter) writeInit() error {
+	var err error
 	fw.initialized = true
 
 	fw.h.Flags = fw.Flags
 	fw.h.Method = fw.Method
 	fw.h.ModifiedTime = fw.ModifiedTime
 
-	comp, ok := compressors[fw.h.Method.ID()]
-	if !ok {
-		return errors.New("Unsupport compress method")
-	}
-
 	fw.compCounter = &CountWriter{w: fw.w}
-	fw.compWriter = comp(fw.compCounter, fw.h.Method.get())
+	fw.compWriter, err = fw.h.Method.newCompressor(fw.compCounter)
+	if err != nil {
+		return err
+	}
 	fw.uncompCounter = &CountWriter{w: fw.compWriter}
 	fw.crc32 = crc32.NewIEEE()
 
