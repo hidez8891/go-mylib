@@ -49,6 +49,13 @@ var tests = map[string]testcase{
 		mtime:      time.Date(2022, time.Month(5), 6, 12, 34, 56, 0, time.UTC),
 		zipcomment: "zip comment",
 	},
+	"empty-mtime": {
+		path:     "test-nomtime.zip",
+		filename: "test.txt",
+		content:  "Hello World!",
+		flags:    FlagType{},
+		mtime:    time.Time{},
+	},
 }
 
 func TestReader(t *testing.T) {
@@ -87,7 +94,7 @@ func testcaseCompare(t *testing.T, r io.ReadSeeker, tt testcase) {
 	if f.FileName != tt.filename {
 		t.Errorf("Filename get %q, want %q", f.FileName, tt.filename)
 	}
-	if f.ModifiedTime != tt.mtime {
+	if !f.ModifiedTime.Equal(tt.mtime) {
 		t.Errorf("ModifiedTime get %v, want %v", f.ModifiedTime, tt.mtime)
 	}
 	if f.Flags.get() != tt.flags.get() {

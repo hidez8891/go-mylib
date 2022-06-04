@@ -4,13 +4,13 @@ import (
 	"go-mylib/buffer"
 	"io/ioutil"
 	"testing"
-	"time"
 )
 
 var wtests = []string{
 	"data-descriptor",
 	"no-data-descriptor",
 	"comment",
+	"empty-mtime",
 }
 
 func TestWriter(t *testing.T) {
@@ -70,14 +70,9 @@ func testWriter(t *testing.T, tt testcase) {
 }
 
 func TestWriterAutoClose(t *testing.T) {
-	// adust mtime
-	mtime := time.Now()
-	mtime = time.Date(mtime.Year(), mtime.Month(), mtime.Day(), mtime.Hour(), mtime.Minute(), mtime.Second() & ^0x01, 0, mtime.Location()).UTC()
-
 	tt := testcase{
 		filename: "test.txt",
 		content:  "Hello World",
-		mtime:    mtime,
 	}
 
 	buf := new(buffer.Buffer)
@@ -90,6 +85,8 @@ func TestWriterAutoClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Writer.Create error=%#v", err)
 	}
+	fw.ModifiedTime = tt.mtime
+
 	if _, err := fw.Write([]byte(tt.content)); err != nil {
 		t.Fatalf("FileWriter.Write error=%#v", err)
 	}

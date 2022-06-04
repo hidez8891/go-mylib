@@ -501,6 +501,10 @@ func (e *endCentralDirectory) WriteTo(w io.Writer) (int64, error) {
 
 // uint32ToUTCTime converts a date/time in uint32 format to time.Time format.
 func uint32ToUTCTime(dates uint16, times uint16) time.Time {
+	if dates == 0 && times == 0 {
+		return time.Time{}
+	}
+
 	year := int((dates >> 9) & 0x7f)
 	monh := int((dates >> 5) & 0x0f)
 	days := int((dates >> 0) & 0x1f)
@@ -516,6 +520,10 @@ func uint32ToUTCTime(dates uint16, times uint16) time.Time {
 
 // utcTimeToUint32 converts time.Time format to uint32 format date/time.
 func utcTimeToUint32(t time.Time) (dates uint16, times uint16) {
+	if t.IsZero() || t.Year() < 1980 {
+		return 0, 0
+	}
+
 	t = t.UTC()
 	dates |= (uint16(t.Year()) - 1980) << 9
 	dates |= uint16(t.Month()) << 5
