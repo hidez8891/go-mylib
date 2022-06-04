@@ -50,13 +50,13 @@ func (w *Writer) Create(name string) (*FileWriter, error) {
 
 	h := &centralDirectoryHeader{
 		localFileHeader: localFileHeader{
-			RequireVersion: 20, // require deflate compression
+			RequireVersion: newVersionType(20), // require deflate compression
 			Flags:          FlagType{},
 			Method:         &MethodDeflated{DefaultCompression},
 			ModifiedTime:   time.Now(),
 			FileName:       name,
 		},
-		GenerateVersion:   MadeByMSDOS | 20,
+		GenerateVersion:   newVersionType(20),
 		LocalHeaderOffset: uint32(offset),
 	}
 

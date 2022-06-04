@@ -22,13 +22,6 @@ const (
 )
 
 const (
-	MadeByMSDOS uint16 = 0x0000 // version for MS-DOS and OS/2 (FAT, FAT32)
-	MadeByUNIX  uint16 = 0x0300 // version for UNIX
-	MadeByNEFS  uint16 = 0x0a00 // version for Windows NTFS
-	MadeByOSX   uint16 = 0x1300 // version for OS X
-)
-
-const (
 	flagDataDescriptor uint16 = 0x0008 // flag for data descriptor
 	flagUTF8           uint16 = 0x0800 // flag for UTF-8
 )
@@ -57,17 +50,78 @@ func (f *FlagType) get() (flag uint16) {
 	return flag
 }
 
+const (
+	madebyMSDOS   uint16 = 0x00 // made by MS-DOS
+	madebyUNIX    uint16 = 0x03 // made by UNIX
+	madebyWindows uint16 = 0x0a // made by Windows
+	madebyOSX     uint16 = 0x13 // made by OS X (Darwin)
+)
+
+// VersionType represents a version of a zip content.
+type VersionType uint16
+
+func newVersionType(version int) VersionType {
+	var v VersionType
+	v.SetVersion(version)
+	return v
+}
+
+// Version returns a version number of a zip content.
+func (v VersionType) Version() int {
+	return int(v & 0x00ff)
+}
+
+// MadeOS returns a generate OS of a zip content.
+func (v VersionType) MadeOS() string {
+	switch uint16(v >> 8) {
+	case madebyMSDOS:
+		return "MS-DOS"
+	case madebyUNIX:
+		return "UNIX"
+	case madebyWindows:
+		return "Windows"
+	case madebyOSX:
+		return "OS X"
+	default:
+		return "Unknown OS"
+	}
+}
+
+// SetVersion sets a version number of a zip content.
+func (v *VersionType) SetVersion(version int) {
+	*v = VersionType((uint16(version) & 0x00ff) | (uint16(*v) & 0xff00))
+}
+
+// SetMadeOS sets a generate OS of a zip content.
+func (v *VersionType) SetMadeOS(os string) {
+	var id uint16
+	switch os {
+	case "MS-DOS":
+		id = madebyMSDOS
+	case "UNIX":
+		id = madebyUNIX
+	case "Windows":
+		id = madebyWindows
+	case "OS X":
+		id = madebyOSX
+	default:
+		id = 0x00 // default value
+	}
+
+	*v = VersionType((id << 8) | (uint16(*v) & 0x00ff))
+}
+
 // localFileHeader represents a local file header in the ZIP specification.
 type localFileHeader struct {
-	RequireVersion   uint16     // version needed to extract
-	Flags            FlagType   // general purpose bit flag
-	Method           MethodType // compression method
-	ModifiedTime     time.Time  // last modified file date/time
-	CRC32            uint32     // CRC-32 for uncompressed data
-	CompressedSize   uint32     // compressed data size
-	UncompressedSize uint32     // uncompressed data size
-	FileName         string     // file name
-	ExtraFields      []byte     // extra field data
+	RequireVersion   VersionType // version needed to extract
+	Flags            FlagType    // general purpose bit flag
+	Method           MethodType  // compression method
+	ModifiedTime     time.Time   // last modified file date/time
+	CRC32            uint32      // CRC-32 for uncompressed data
+	CompressedSize   uint32      // compressed data size
+	UncompressedSize uint32      // uncompressed data size
+	FileName         string      // file name
+	ExtraFields      []byte      // extra field data
 }
 
 // ReadFrom reads a local file header from io.Reader.
@@ -94,7 +148,7 @@ func (h *localFileHeader) ReadFrom(r io.Reader) (int64, error) {
 		extraSize uint16
 	)
 	rr := bytes.NewReader(data[:])
-	byteio.GetUint16LE(rr, &h.RequireVersion)
+	byteio.GetUint16LE(rr, (*uint16)(&h.RequireVersion))
 	byteio.GetUint16LE(rr, &flag)
 	byteio.GetUint16LE(rr, &method)
 	byteio.GetUint16LE(rr, &modtime)
@@ -144,7 +198,7 @@ func (h *localFileHeader) WriteTo(w io.Writer) (int64, error) {
 
 	buf := new(bytes.Buffer)
 	buf.Write([]byte(signLocalFileHeader))
-	byteio.WriteUint16LE(buf, h.RequireVersion)
+	byteio.WriteUint16LE(buf, uint16(h.RequireVersion))
 	byteio.WriteUint16LE(buf, flag)
 	byteio.WriteUint16LE(buf, method)
 	byteio.WriteUint16LE(buf, modtime)
@@ -175,11 +229,11 @@ func (h *localFileHeader) WriteTo(w io.Writer) (int64, error) {
 // centralDirectoryHeader represents a central directory header in the ZIP specification.
 type centralDirectoryHeader struct {
 	localFileHeader
-	GenerateVersion   uint16 // version made by
-	InternalFileAttr  uint16 // internal file attributes
-	ExternalFileAttr  uint32 // external file attributes
-	LocalHeaderOffset uint32 // relative offset of local header
-	Comment           string // file comment
+	GenerateVersion   VersionType // version made by
+	InternalFileAttr  uint16      // internal file attributes
+	ExternalFileAttr  uint32      // external file attributes
+	LocalHeaderOffset uint32      // relative offset of local header
+	Comment           string      // file comment
 }
 
 // ReadFrom reads a central directory header from io.Reader.
@@ -208,8 +262,8 @@ func (h *centralDirectoryHeader) ReadFrom(r io.Reader) (int64, error) {
 		diskNumber  uint16
 	)
 	rr := bytes.NewReader(data[:])
-	byteio.GetUint16LE(rr, &h.GenerateVersion)
-	byteio.GetUint16LE(rr, &h.RequireVersion)
+	byteio.GetUint16LE(rr, (*uint16)(&h.GenerateVersion))
+	byteio.GetUint16LE(rr, (*uint16)(&h.RequireVersion))
 	byteio.GetUint16LE(rr, &flag)
 	byteio.GetUint16LE(rr, &method)
 	byteio.GetUint16LE(rr, &modtime)
@@ -278,8 +332,8 @@ func (h *centralDirectoryHeader) WriteTo(w io.Writer) (int64, error) {
 
 	buf := new(bytes.Buffer)
 	w.Write([]byte(signCentralDirectoryHeader))
-	byteio.WriteUint16LE(buf, h.GenerateVersion)
-	byteio.WriteUint16LE(buf, h.RequireVersion)
+	byteio.WriteUint16LE(buf, uint16(h.GenerateVersion))
+	byteio.WriteUint16LE(buf, uint16(h.RequireVersion))
 	byteio.WriteUint16LE(buf, flag)
 	byteio.WriteUint16LE(buf, method)
 	byteio.WriteUint16LE(buf, modtime)
