@@ -113,15 +113,15 @@ func (v *VersionType) SetMadeOS(os string) {
 
 // localFileHeader represents a local file header in the ZIP specification.
 type localFileHeader struct {
-	RequireVersion   VersionType // version needed to extract
-	Flags            FlagType    // general purpose bit flag
-	Method           MethodType  // compression method
-	ModifiedTime     time.Time   // last modified file date/time
-	CRC32            uint32      // CRC-32 for uncompressed data
-	CompressedSize   uint32      // compressed data size
-	UncompressedSize uint32      // uncompressed data size
-	FileName         string      // file name
-	ExtraFields      []byte      // extra field data
+	RequireVersion   VersionType  // version needed to extract
+	Flags            FlagType     // general purpose bit flag
+	Method           MethodType   // compression method
+	ModifiedTime     time.Time    // last modified file date/time
+	CRC32            uint32       // CRC-32 for uncompressed data
+	CompressedSize   uint32       // compressed data size
+	UncompressedSize uint32       // uncompressed data size
+	FileName         string       // file name
+	ExtraFields      []ExtraField // extra field data
 }
 
 // ReadFrom reads a local file header from io.Reader.
@@ -178,12 +178,18 @@ func (h *localFileHeader) ReadFrom(r io.Reader) (int64, error) {
 	}
 	h.FileName = string(nameBuf)
 
+	h.ExtraFields = make([]ExtraField, 0)
 	if extraSize != 0 {
 		extraBuf := make([]byte, extraSize)
 		if _, err := io.ReadAtLeast(r, extraBuf, len(extraBuf)); err != nil {
 			return 0, err
 		}
-		h.ExtraFields = extraBuf
+
+		if extras, err := parseExtraFields(extraBuf); err != nil {
+			return 0, err
+		} else {
+			h.ExtraFields = extras
+		}
 	}
 
 	return int64(sizeLocalFileHeader) + int64(nameSize) + int64(extraSize), nil
@@ -206,21 +212,22 @@ func (h *localFileHeader) WriteTo(w io.Writer) (int64, error) {
 	byteio.WriteUint32LE(buf, h.CRC32)
 	byteio.WriteUint32LE(buf, h.CompressedSize)
 	byteio.WriteUint32LE(buf, h.UncompressedSize)
-	byteio.WriteUint16LE(buf, uint16(len(h.FileName)))
-	byteio.WriteUint16LE(buf, uint16(len(h.ExtraFields)))
 
 	if len(h.FileName) == 0 {
 		return 0, errors.New("invalid file name: name length is 0")
 	}
-	if _, err := buf.Write([]byte(h.FileName)); err != nil {
-		return 0, err
-	}
+	byteio.WriteUint16LE(buf, uint16(len(h.FileName)))
 
-	if len(h.ExtraFields) != 0 {
-		if _, err := buf.Write([]byte(h.ExtraFields)); err != nil {
+	extras := new(bytes.Buffer)
+	for _, extra := range h.ExtraFields {
+		if _, err := extra.WriteTo(extras); err != nil {
 			return 0, err
 		}
 	}
+	byteio.WriteUint16LE(buf, uint16(extras.Len()))
+
+	buf.Write([]byte(h.FileName))
+	buf.Write(extras.Bytes())
 
 	n, err := w.Write(buf.Bytes())
 	return int64(n), err
@@ -302,12 +309,18 @@ func (h *centralDirectoryHeader) ReadFrom(r io.Reader) (int64, error) {
 	}
 	h.FileName = string(nameBuf)
 
+	h.ExtraFields = make([]ExtraField, 0)
 	if extraSize != 0 {
 		extraBuf := make([]byte, extraSize)
 		if _, err := io.ReadAtLeast(r, extraBuf, len(extraBuf)); err != nil {
 			return 0, err
 		}
-		h.ExtraFields = extraBuf
+
+		if extras, err := parseExtraFields(extraBuf); err != nil {
+			return 0, err
+		} else {
+			h.ExtraFields = extras
+		}
 	}
 
 	if commentSize != 0 {
@@ -341,32 +354,29 @@ func (h *centralDirectoryHeader) WriteTo(w io.Writer) (int64, error) {
 	byteio.WriteUint32LE(buf, h.CRC32)
 	byteio.WriteUint32LE(buf, h.CompressedSize)
 	byteio.WriteUint32LE(buf, h.UncompressedSize)
+
+	if len(h.FileName) == 0 {
+		return 0, errors.New("invalid file name: name length is 0")
+	}
 	byteio.WriteUint16LE(buf, uint16(len(h.FileName)))
-	byteio.WriteUint16LE(buf, uint16(len(h.ExtraFields)))
+
+	extras := new(bytes.Buffer)
+	for _, extra := range h.ExtraFields {
+		if _, err := extra.WriteTo(extras); err != nil {
+			return 0, err
+		}
+	}
+	byteio.WriteUint16LE(buf, uint16(extras.Len()))
+
 	byteio.WriteUint16LE(buf, uint16(len(h.Comment)))
 	byteio.WriteUint16LE(buf, 0)
 	byteio.WriteUint16LE(buf, h.InternalFileAttr)
 	byteio.WriteUint32LE(buf, h.ExternalFileAttr)
 	byteio.WriteUint32LE(buf, h.LocalHeaderOffset)
 
-	if len(h.FileName) == 0 {
-		return 0, errors.New("invalid file name: name length is 0")
-	}
-	if _, err := buf.Write([]byte(h.FileName)); err != nil {
-		return 0, err
-	}
-
-	if len(h.ExtraFields) != 0 {
-		if _, err := buf.Write(h.ExtraFields); err != nil {
-			return 0, err
-		}
-	}
-
-	if len(h.Comment) != 0 {
-		if _, err := buf.Write([]byte(h.Comment)); err != nil {
-			return 0, err
-		}
-	}
+	buf.Write([]byte(h.FileName))
+	buf.Write(extras.Bytes())
+	buf.Write([]byte(h.Comment))
 
 	n, err := w.Write(buf.Bytes())
 	return int64(n), err

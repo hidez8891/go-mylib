@@ -17,6 +17,42 @@ type ExtraField interface {
 	WriteTo(w io.Writer) (int64, error)
 }
 
+// parseExtraFields parses the extra field list from the buffer.
+func parseExtraFields(buf []byte) ([]ExtraField, error) {
+	extraFields := make([]ExtraField, 0)
+	size := 0
+
+	r := bytes.NewReader(buf)
+	for size < len(buf) {
+		e := &ExtraUnknown{}
+		if _, err := e.ReadFrom(r); err != nil {
+			return nil, err
+		}
+
+		var extra ExtraField
+		switch e.Tag() {
+		case extraNTFSTag:
+			extra = &ExtraNTFS{}
+		default:
+			extra = nil
+		}
+
+		if extra != nil {
+			r2 := bytes.NewReader(e.Data)
+			if _, err := extra.ReadFrom(r2); err != nil {
+				return nil, err
+			}
+			extraFields = append(extraFields, extra)
+		} else {
+			extraFields = append(extraFields, e)
+		}
+
+		size += len(e.Data)
+	}
+
+	return extraFields, nil
+}
+
 // ExtraUnknown represents a unknown extra field.
 type ExtraUnknown struct {
 	tag  uint16

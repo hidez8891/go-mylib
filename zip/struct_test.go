@@ -59,8 +59,8 @@ func hexToBytes(hex string) []byte {
 func Test_localFileHeader(t *testing.T) {
 	src := hexToBytes(`
 		50 4b 03 04 14 00 08 00 08 00 5c 64 a6 54 04 03
-		02 01 78 56 34 12 09 ef cd ab 08 00 04 00 66 69
-		6c 65 6e 61 6d 65 04 03 02 01
+		02 01 78 56 34 12 09 ef cd ab 08 00 06 00 66 69
+		6c 65 6e 61 6d 65 ff ee 02 00 00 00
 	`)
 	expect := localFileHeader{
 		RequireVersion:   0x0014,
@@ -71,7 +71,12 @@ func Test_localFileHeader(t *testing.T) {
 		CompressedSize:   0x12345678,
 		UncompressedSize: 0xabcdef09,
 		FileName:         "filename",
-		ExtraFields:      hexToBytes("04 03 02 01"),
+		ExtraFields: []ExtraField{
+			&ExtraUnknown{
+				tag:  0xeeff,
+				Data: hexToBytes("ff ee 02 00 00 00"),
+			},
+		},
 	}
 
 	{
@@ -110,11 +115,6 @@ func Test_localFileHeader(t *testing.T) {
 		if len(h.ExtraFields) != len(expect.ExtraFields) {
 			t.Fatalf("ExtraFields size=%d, want=%d", len(h.ExtraFields), len(expect.ExtraFields))
 		}
-		for i := range h.ExtraFields {
-			if h.ExtraFields[i] != expect.ExtraFields[i] {
-				t.Fatalf("ExtraFields[%d]=%x, want=%x", i, h.ExtraFields[i], expect.ExtraFields[i])
-			}
-		}
 	}
 
 	{
@@ -138,10 +138,10 @@ func Test_localFileHeader(t *testing.T) {
 func Test_centralDirectoryHeader(t *testing.T) {
 	src := hexToBytes(`
         50 4b 01 02 20 00 14 00 08 00 08 00 5c 64 a6 54
-		04 03 02 01 78 56 34 12 09 ef cd ab 08 00 04 00
+		04 03 02 01 78 56 34 12 09 ef cd ab 08 00 06 00
 		07 00 00 00 01 00 03 00 00 00 b9 0f 00 00 66 69
-		6c 65 6e 61 6d 65 04 03 02 01 63 6F 6D 6D 65 6E
-		74
+		6c 65 6e 61 6d 65 ff ee 02 00 00 00 63 6F 6D 6D
+		65 6E 74
 	`)
 	expect := centralDirectoryHeader{
 		localFileHeader: localFileHeader{
@@ -153,7 +153,12 @@ func Test_centralDirectoryHeader(t *testing.T) {
 			CompressedSize:   0x12345678,
 			UncompressedSize: 0xabcdef09,
 			FileName:         "filename",
-			ExtraFields:      hexToBytes("04 03 02 01"),
+			ExtraFields: []ExtraField{
+				&ExtraUnknown{
+					tag:  0xeeff,
+					Data: hexToBytes("ff ee 02 00 00 00"),
+				},
+			},
 		},
 		GenerateVersion:   0x0020,
 		InternalFileAttr:  0x0001,
@@ -200,11 +205,6 @@ func Test_centralDirectoryHeader(t *testing.T) {
 
 		if len(h.ExtraFields) != len(expect.ExtraFields) {
 			t.Fatalf("ExtraFields size=%d, want=%d", len(h.ExtraFields), len(expect.ExtraFields))
-		}
-		for i := range h.ExtraFields {
-			if h.ExtraFields[i] != expect.ExtraFields[i] {
-				t.Fatalf("ExtraFields[%d]=%x, want=%x", i, h.ExtraFields[i], expect.ExtraFields[i])
-			}
 		}
 
 		if h.Comment != expect.Comment {
