@@ -9,17 +9,22 @@ import (
 	"go-mylib/byteio"
 )
 
-const (
-	signLocalFileHeader        string = "PK\x03\x04" // signature of a local file header
-	signCentralDirectoryHeader string = "PK\x01\x02" // signature of a central directory header
-	signDataDescriptor         string = "PK\x07\x08" // signature of a data descriptor
-	signEndCentralDirectory    string = "PK\x05\x06" // signature of an end of central directory record
-
-	sizeLocalFileHeader        int = 30 // size of a local file header
-	sizeCentralDirectoryHeader int = 46 // size of a central directory header
-	sizeDataDescriptor         int = 16 // size of a data descriptor
-	sizeEndCentralDirectory    int = 22 // size of an end of central directory record
-)
+type FileHeader struct {
+	MinimumVersion   int          // version needed to extract the file
+	GenerateVersion  int          // version used to generate the file
+	GenerateOS       OSType       // operating system used to generate the file
+	Flags            FlagType     // general purpose flag
+	Method           MethodType   // compression method
+	ModifiedTime     time.Time    // last modification time
+	CRC32            uint32       // CRC-32 for uncompressed data
+	CompressedSize   uint32       // compressed data size
+	UncompressedSize uint32       // uncompressed data size
+	FileName         string       // file name
+	ExtraFields      []ExtraField // extra field data
+	InternalFileAttr uint16       // internal file attributes
+	ExternalFileAttr uint32       // external file attributes
+	Comment          string       // file comment
+}
 
 const (
 	flagDataDescriptor uint16 = 0x0008 // flag for data descriptor
@@ -50,78 +55,40 @@ func (f *FlagType) get() (flag uint16) {
 	return flag
 }
 
+// OSType represents operating system ID.
+type OSType uint16
+
 const (
-	madebyMSDOS   uint16 = 0x00 // made by MS-DOS
-	madebyUNIX    uint16 = 0x03 // made by UNIX
-	madebyWindows uint16 = 0x0a // made by Windows
-	madebyOSX     uint16 = 0x13 // made by OS X (Darwin)
+	OS_MSDOS OSType = 0  // MS-DOS
+	OS_UNIX  OSType = 3  // UNIX
+	OS_NTFS  OSType = 10 // NTFS
+	OS_OSX   OSType = 19 // OSX
 )
 
-// VersionType represents a version of a zip content.
-type VersionType uint16
+const (
+	signLocalFileHeader        string = "PK\x03\x04" // signature of a local file header
+	signCentralDirectoryHeader string = "PK\x01\x02" // signature of a central directory header
+	signDataDescriptor         string = "PK\x07\x08" // signature of a data descriptor
+	signEndCentralDirectory    string = "PK\x05\x06" // signature of an end of central directory record
 
-func newVersionType(version int) VersionType {
-	var v VersionType
-	v.SetVersion(version)
-	return v
-}
-
-// Version returns a version number of a zip content.
-func (v VersionType) Version() int {
-	return int(v & 0x00ff)
-}
-
-// MadeOS returns a generate OS of a zip content.
-func (v VersionType) MadeOS() string {
-	switch uint16(v >> 8) {
-	case madebyMSDOS:
-		return "MS-DOS"
-	case madebyUNIX:
-		return "UNIX"
-	case madebyWindows:
-		return "Windows"
-	case madebyOSX:
-		return "OS X"
-	default:
-		return "Unknown OS"
-	}
-}
-
-// SetVersion sets a version number of a zip content.
-func (v *VersionType) SetVersion(version int) {
-	*v = VersionType((uint16(version) & 0x00ff) | (uint16(*v) & 0xff00))
-}
-
-// SetMadeOS sets a generate OS of a zip content.
-func (v *VersionType) SetMadeOS(os string) {
-	var id uint16
-	switch os {
-	case "MS-DOS":
-		id = madebyMSDOS
-	case "UNIX":
-		id = madebyUNIX
-	case "Windows":
-		id = madebyWindows
-	case "OS X":
-		id = madebyOSX
-	default:
-		id = 0x00 // default value
-	}
-
-	*v = VersionType((id << 8) | (uint16(*v) & 0x00ff))
-}
+	sizeLocalFileHeader        int = 30 // size of a local file header
+	sizeCentralDirectoryHeader int = 46 // size of a central directory header
+	sizeDataDescriptor         int = 16 // size of a data descriptor
+	sizeEndCentralDirectory    int = 22 // size of an end of central directory record
+)
 
 // localFileHeader represents a local file header in the ZIP specification.
 type localFileHeader struct {
-	RequireVersion   VersionType  // version needed to extract
-	Flags            FlagType     // general purpose bit flag
-	Method           MethodType   // compression method
-	ModifiedTime     time.Time    // last modified file date/time
-	CRC32            uint32       // CRC-32 for uncompressed data
-	CompressedSize   uint32       // compressed data size
-	UncompressedSize uint32       // uncompressed data size
-	FileName         string       // file name
-	ExtraFields      []ExtraField // extra field data
+	minimumVersion   uint16 // version needed to extract
+	flag             uint16 // general purpose bit flag
+	method           uint16 // compression method
+	modtime          uint16 // last modified file time
+	moddate          uint16 // last modified file date
+	crc32            uint32 // CRC-32 for uncompressed data
+	compressedSize   uint32 // compressed data size
+	uncompressedSize uint32 // uncompressed data size
+	fileName         []byte // file name
+	extraFields      []byte // extra field data
 }
 
 // ReadFrom reads a local file header from io.Reader.
@@ -140,107 +107,133 @@ func (h *localFileHeader) ReadFrom(r io.Reader) (int64, error) {
 	}
 
 	var (
-		flag      uint16
-		method    uint16
-		modtime   uint16
-		moddate   uint16
 		nameSize  uint16
 		extraSize uint16
 	)
 	rr := bytes.NewReader(data[:])
-	byteio.GetUint16LE(rr, (*uint16)(&h.RequireVersion))
-	byteio.GetUint16LE(rr, &flag)
-	byteio.GetUint16LE(rr, &method)
-	byteio.GetUint16LE(rr, &modtime)
-	byteio.GetUint16LE(rr, &moddate)
-	byteio.GetUint32LE(rr, &h.CRC32)
-	byteio.GetUint32LE(rr, &h.CompressedSize)
-	byteio.GetUint32LE(rr, &h.UncompressedSize)
+	byteio.GetUint16LE(rr, &h.minimumVersion)
+	byteio.GetUint16LE(rr, &h.flag)
+	byteio.GetUint16LE(rr, &h.method)
+	byteio.GetUint16LE(rr, &h.modtime)
+	byteio.GetUint16LE(rr, &h.moddate)
+	byteio.GetUint32LE(rr, &h.crc32)
+	byteio.GetUint32LE(rr, &h.compressedSize)
+	byteio.GetUint32LE(rr, &h.uncompressedSize)
 	byteio.GetUint16LE(rr, &nameSize)
 	byteio.GetUint16LE(rr, &extraSize)
 
-	if m, err := methodFactory(method); err != nil {
-		return 0, err
-	} else {
-		h.Method = m
-	}
-
-	h.Flags.set(flag)
-	h.Method.set(flag)
-	h.ModifiedTime = uint32ToUTCTime(moddate, modtime)
-
 	if nameSize == 0 {
-		return 0, errors.New("invalid file name: name length is 0")
+		return 0, errors.New("invalid local file header: name length is 0")
 	}
-	nameBuf := make([]byte, nameSize)
-	if _, err := io.ReadAtLeast(r, nameBuf, len(nameBuf)); err != nil {
+	h.fileName = make([]byte, nameSize)
+	if _, err := r.Read(h.fileName); err != nil {
 		return 0, err
 	}
-	h.FileName = string(nameBuf)
 
-	h.ExtraFields = make([]ExtraField, 0)
+	h.extraFields = make([]byte, extraSize)
 	if extraSize != 0 {
-		extraBuf := make([]byte, extraSize)
-		if _, err := io.ReadAtLeast(r, extraBuf, len(extraBuf)); err != nil {
+		if _, err := r.Read(h.extraFields); err != nil {
 			return 0, err
-		}
-
-		if extras, err := parseExtraFields(extraBuf); err != nil {
-			return 0, err
-		} else {
-			h.ExtraFields = extras
 		}
 	}
 
-	return int64(sizeLocalFileHeader) + int64(nameSize) + int64(extraSize), nil
+	size := int64(sizeLocalFileHeader)
+	size += +int64(nameSize) + int64(extraSize)
+	return size, nil
 }
 
 // WriteTo writes a local file header to io.Writer.
 func (h *localFileHeader) WriteTo(w io.Writer) (int64, error) {
-	flag := h.Flags.get()
-	flag |= h.Method.get()
-	method := h.Method.ID()
-	moddate, modtime := utcTimeToUint32(h.ModifiedTime)
-
 	buf := new(bytes.Buffer)
 	buf.Write([]byte(signLocalFileHeader))
-	byteio.WriteUint16LE(buf, uint16(h.RequireVersion))
-	byteio.WriteUint16LE(buf, flag)
-	byteio.WriteUint16LE(buf, method)
-	byteio.WriteUint16LE(buf, modtime)
-	byteio.WriteUint16LE(buf, moddate)
-	byteio.WriteUint32LE(buf, h.CRC32)
-	byteio.WriteUint32LE(buf, h.CompressedSize)
-	byteio.WriteUint32LE(buf, h.UncompressedSize)
+	byteio.WriteUint16LE(buf, h.minimumVersion)
+	byteio.WriteUint16LE(buf, h.flag)
+	byteio.WriteUint16LE(buf, h.method)
+	byteio.WriteUint16LE(buf, h.modtime)
+	byteio.WriteUint16LE(buf, h.moddate)
+	byteio.WriteUint32LE(buf, h.crc32)
+	byteio.WriteUint32LE(buf, h.compressedSize)
+	byteio.WriteUint32LE(buf, h.uncompressedSize)
 
-	if len(h.FileName) == 0 {
-		return 0, errors.New("invalid file name: name length is 0")
+	if len(h.fileName) == 0 {
+		return 0, errors.New("invalid local file header: name length is 0")
 	}
-	byteio.WriteUint16LE(buf, uint16(len(h.FileName)))
+	byteio.WriteUint16LE(buf, uint16(len(h.fileName)))
 
-	extras := new(bytes.Buffer)
-	for _, extra := range h.ExtraFields {
-		if _, err := extra.WriteTo(extras); err != nil {
-			return 0, err
-		}
-	}
-	byteio.WriteUint16LE(buf, uint16(extras.Len()))
-
-	buf.Write([]byte(h.FileName))
-	buf.Write(extras.Bytes())
+	byteio.WriteUint16LE(buf, uint16(len(h.extraFields)))
+	buf.Write(h.fileName)
+	buf.Write(h.extraFields)
 
 	n, err := w.Write(buf.Bytes())
 	return int64(n), err
 }
 
+// copyFromHeader copies a local file header from FileHeader.
+func (h *localFileHeader) copyFromHeader(fh *FileHeader) error {
+	extras := new(bytes.Buffer)
+	for _, extra := range fh.ExtraFields {
+		if _, err := extra.WriteTo(extras); err != nil {
+			return err
+		}
+	}
+
+	h.minimumVersion = uint16(fh.MinimumVersion) & 0x00ff
+	h.flag = fh.Flags.get() | fh.Method.get()
+	h.method = fh.Method.ID()
+	h.moddate, h.modtime = uint16FromDosTime(fh.ModifiedTime)
+	h.crc32 = fh.CRC32
+	h.compressedSize = fh.CompressedSize
+	h.uncompressedSize = fh.UncompressedSize
+	h.fileName = []byte(fh.FileName)
+	h.extraFields = extras.Bytes()
+
+	return nil
+}
+
+// copyToHeader copies a local file header to FileHeader.
+func (h *localFileHeader) copyToHeader(fh *FileHeader) error {
+	method, err := methodFactory(h.method)
+	if err != nil {
+		return err
+	}
+
+	extra, err := parseExtraFields(h.extraFields)
+	if err != nil {
+		return err
+	}
+
+	fh.MinimumVersion = int(h.minimumVersion)
+	fh.Flags.set(h.flag)
+	fh.Method = method
+	fh.Method.set(h.flag)
+	fh.ModifiedTime = uint16ToDosTime(h.moddate, h.modtime)
+	fh.CRC32 = h.crc32
+	fh.CompressedSize = h.compressedSize
+	fh.UncompressedSize = h.uncompressedSize
+	fh.FileName = string(h.fileName)
+	fh.ExtraFields = extra
+
+	return nil
+}
+
 // centralDirectoryHeader represents a central directory header in the ZIP specification.
 type centralDirectoryHeader struct {
-	localFileHeader
-	GenerateVersion   VersionType // version made by
-	InternalFileAttr  uint16      // internal file attributes
-	ExternalFileAttr  uint32      // external file attributes
-	LocalHeaderOffset uint32      // relative offset of local header
-	Comment           string      // file comment
+	generateVersion   uint16 // version used to generate the file
+	minimumVersion    uint16 // version needed to extract the file
+	flag              uint16 // general purpose bit flag
+	method            uint16 // compression method
+	modtime           uint16 // last modified file time
+	moddate           uint16 // last modified file date
+	crc32             uint32 // CRC-32 for uncompressed data
+	compressedSize    uint32 // compressed data size
+	uncompressedSize  uint32 // uncompressed data size
+	diskNumber        uint16 // disk number start
+	internalFileAttr  uint16 // internal file attributes
+	externalFileAttr  uint32 // external file attributes
+	localHeaderOffset uint32 // relative offset of local header
+	fileName          []byte // file name
+	extraFields       []byte // extra field data
+	comment           []byte // file comment
 }
 
 // ReadFrom reads a central directory header from io.Reader.
@@ -259,134 +252,152 @@ func (h *centralDirectoryHeader) ReadFrom(r io.Reader) (int64, error) {
 	}
 
 	var (
-		flag        uint16
-		method      uint16
-		modtime     uint16
-		moddate     uint16
 		nameSize    uint16
 		extraSize   uint16
 		commentSize uint16
-		diskNumber  uint16
 	)
 	rr := bytes.NewReader(data[:])
-	byteio.GetUint16LE(rr, (*uint16)(&h.GenerateVersion))
-	byteio.GetUint16LE(rr, (*uint16)(&h.RequireVersion))
-	byteio.GetUint16LE(rr, &flag)
-	byteio.GetUint16LE(rr, &method)
-	byteio.GetUint16LE(rr, &modtime)
-	byteio.GetUint16LE(rr, &moddate)
-	byteio.GetUint32LE(rr, &h.CRC32)
-	byteio.GetUint32LE(rr, &h.CompressedSize)
-	byteio.GetUint32LE(rr, &h.UncompressedSize)
+	byteio.GetUint16LE(rr, &h.generateVersion)
+	byteio.GetUint16LE(rr, &h.minimumVersion)
+	byteio.GetUint16LE(rr, &h.flag)
+	byteio.GetUint16LE(rr, &h.method)
+	byteio.GetUint16LE(rr, &h.modtime)
+	byteio.GetUint16LE(rr, &h.moddate)
+	byteio.GetUint32LE(rr, &h.crc32)
+	byteio.GetUint32LE(rr, &h.compressedSize)
+	byteio.GetUint32LE(rr, &h.uncompressedSize)
 	byteio.GetUint16LE(rr, &nameSize)
 	byteio.GetUint16LE(rr, &extraSize)
 	byteio.GetUint16LE(rr, &commentSize)
-	byteio.GetUint16LE(rr, &diskNumber)
-	byteio.GetUint16LE(rr, &h.InternalFileAttr)
-	byteio.GetUint32LE(rr, &h.ExternalFileAttr)
-	byteio.GetUint32LE(rr, &h.LocalHeaderOffset)
+	byteio.GetUint16LE(rr, &h.diskNumber)
+	byteio.GetUint16LE(rr, &h.internalFileAttr)
+	byteio.GetUint32LE(rr, &h.externalFileAttr)
+	byteio.GetUint32LE(rr, &h.localHeaderOffset)
 
-	if m, err := methodFactory(method); err != nil {
-		return 0, err
-	} else {
-		h.Method = m
-	}
-
-	h.Flags.set(flag)
-	h.Method.set(flag)
-	h.ModifiedTime = uint32ToUTCTime(moddate, modtime)
-
-	if diskNumber != 0 {
+	if h.diskNumber != 0 {
 		return 0, errors.New("unsupport split zip file")
 	}
 
 	if nameSize == 0 {
-		return 0, errors.New("invalid file name: name length is 0")
+		return 0, errors.New("invalid central file header: name length is 0")
 	}
-	nameBuf := make([]byte, nameSize)
-	if _, err := io.ReadAtLeast(r, nameBuf, len(nameBuf)); err != nil {
+	h.fileName = make([]byte, nameSize)
+	if _, err := r.Read(h.fileName); err != nil {
 		return 0, err
 	}
-	h.FileName = string(nameBuf)
 
-	h.ExtraFields = make([]ExtraField, 0)
+	h.extraFields = make([]byte, extraSize)
 	if extraSize != 0 {
-		extraBuf := make([]byte, extraSize)
-		if _, err := io.ReadAtLeast(r, extraBuf, len(extraBuf)); err != nil {
+		if _, err := r.Read(h.extraFields); err != nil {
 			return 0, err
-		}
-
-		if extras, err := parseExtraFields(extraBuf); err != nil {
-			return 0, err
-		} else {
-			h.ExtraFields = extras
 		}
 	}
 
+	h.comment = make([]byte, commentSize)
 	if commentSize != 0 {
-		commentBuf := make([]byte, commentSize)
-		if _, err := io.ReadAtLeast(r, commentBuf, len(commentBuf)); err != nil {
+		if _, err := r.Read(h.comment); err != nil {
 			return 0, err
 		}
-		h.Comment = string(commentBuf)
 	}
 
-	size := sizeLocalFileHeader
-	size += int(nameSize) + int(extraSize) + int(commentSize)
-	return int64(size), nil
+	size := int64(sizeLocalFileHeader)
+	size += int64(nameSize) + int64(extraSize) + int64(commentSize)
+	return size, nil
 }
 
 // WriteTo writes a central directory header to io.Writer.
 func (h *centralDirectoryHeader) WriteTo(w io.Writer) (int64, error) {
-	flag := h.Flags.get()
-	flag |= h.Method.get()
-	method := h.Method.ID()
-	moddate, modtime := utcTimeToUint32(h.ModifiedTime)
-
 	buf := new(bytes.Buffer)
 	w.Write([]byte(signCentralDirectoryHeader))
-	byteio.WriteUint16LE(buf, uint16(h.GenerateVersion))
-	byteio.WriteUint16LE(buf, uint16(h.RequireVersion))
-	byteio.WriteUint16LE(buf, flag)
-	byteio.WriteUint16LE(buf, method)
-	byteio.WriteUint16LE(buf, modtime)
-	byteio.WriteUint16LE(buf, moddate)
-	byteio.WriteUint32LE(buf, h.CRC32)
-	byteio.WriteUint32LE(buf, h.CompressedSize)
-	byteio.WriteUint32LE(buf, h.UncompressedSize)
+	byteio.WriteUint16LE(buf, h.generateVersion)
+	byteio.WriteUint16LE(buf, h.minimumVersion)
+	byteio.WriteUint16LE(buf, h.flag)
+	byteio.WriteUint16LE(buf, h.method)
+	byteio.WriteUint16LE(buf, h.modtime)
+	byteio.WriteUint16LE(buf, h.moddate)
+	byteio.WriteUint32LE(buf, h.crc32)
+	byteio.WriteUint32LE(buf, h.compressedSize)
+	byteio.WriteUint32LE(buf, h.uncompressedSize)
 
-	if len(h.FileName) == 0 {
-		return 0, errors.New("invalid file name: name length is 0")
+	if len(h.fileName) == 0 {
+		return 0, errors.New("invalid central file header: name length is 0")
 	}
-	byteio.WriteUint16LE(buf, uint16(len(h.FileName)))
+	byteio.WriteUint16LE(buf, uint16(len(h.fileName)))
 
-	extras := new(bytes.Buffer)
-	for _, extra := range h.ExtraFields {
-		if _, err := extra.WriteTo(extras); err != nil {
-			return 0, err
-		}
-	}
-	byteio.WriteUint16LE(buf, uint16(extras.Len()))
-
-	byteio.WriteUint16LE(buf, uint16(len(h.Comment)))
-	byteio.WriteUint16LE(buf, 0)
-	byteio.WriteUint16LE(buf, h.InternalFileAttr)
-	byteio.WriteUint32LE(buf, h.ExternalFileAttr)
-	byteio.WriteUint32LE(buf, h.LocalHeaderOffset)
-
-	buf.Write([]byte(h.FileName))
-	buf.Write(extras.Bytes())
-	buf.Write([]byte(h.Comment))
+	byteio.WriteUint16LE(buf, uint16(len(h.extraFields)))
+	byteio.WriteUint16LE(buf, uint16(len(h.comment)))
+	byteio.WriteUint16LE(buf, h.diskNumber)
+	byteio.WriteUint16LE(buf, h.internalFileAttr)
+	byteio.WriteUint32LE(buf, h.externalFileAttr)
+	byteio.WriteUint32LE(buf, h.localHeaderOffset)
+	buf.Write(h.fileName)
+	buf.Write(h.extraFields)
+	buf.Write(h.comment)
 
 	n, err := w.Write(buf.Bytes())
 	return int64(n), err
 }
 
+// copyFromHeader copies a central directory header from FileHeader.
+func (h *centralDirectoryHeader) copyFromHeader(fh *FileHeader) error {
+	extras := new(bytes.Buffer)
+	for _, extra := range fh.ExtraFields {
+		if _, err := extra.WriteTo(extras); err != nil {
+			return err
+		}
+	}
+
+	h.generateVersion = uint16(fh.GenerateOS)<<8 | uint16(fh.GenerateVersion)&0x00ff
+	h.minimumVersion = uint16(fh.MinimumVersion) & 0x00ff
+	h.flag = fh.Flags.get() | fh.Method.get()
+	h.method = fh.Method.ID()
+	h.moddate, h.modtime = uint16FromDosTime(fh.ModifiedTime)
+	h.crc32 = fh.CRC32
+	h.compressedSize = fh.CompressedSize
+	h.uncompressedSize = fh.UncompressedSize
+	h.fileName = []byte(fh.FileName)
+	h.extraFields = extras.Bytes()
+	h.comment = []byte(fh.Comment)
+
+	return nil
+}
+
+// copyToHeader copies a central directory header to FileHeader.
+func (h *centralDirectoryHeader) copyToHeader(fh *FileHeader) error {
+	method, err := methodFactory(h.method)
+	if err != nil {
+		return err
+	}
+
+	extra, err := parseExtraFields(h.extraFields)
+	if err != nil {
+		return err
+	}
+
+	fh.MinimumVersion = int(h.minimumVersion)
+	fh.GenerateOS = OSType(h.generateVersion >> 8)
+	fh.GenerateVersion = int(h.generateVersion & 0x00ff)
+	fh.Flags.set(h.flag)
+	fh.Method = method
+	fh.Method.set(h.flag)
+	fh.ModifiedTime = uint16ToDosTime(h.moddate, h.modtime)
+	fh.CRC32 = h.crc32
+	fh.CompressedSize = h.compressedSize
+	fh.UncompressedSize = h.uncompressedSize
+	fh.FileName = string(h.fileName)
+	fh.ExtraFields = extra
+	fh.InternalFileAttr = h.internalFileAttr
+	fh.ExternalFileAttr = h.externalFileAttr
+	fh.Comment = string(h.comment)
+
+	return nil
+}
+
 // dataDescriptor represents a data descriptor in the ZIP specification.
 type dataDescriptor struct {
-	CRC32            uint32 // CRC-32 for uncompressed data
-	CompressedSize   uint32 // compressed data size
-	UncompressedSize uint32 // uncompressed data size
+	crc32            uint32 // CRC-32 for uncompressed data
+	compressedSize   uint32 // compressed data size
+	uncompressedSize uint32 // uncompressed data size
 }
 
 // ReadFrom reads a data descriptor from io.Reader.
@@ -413,9 +424,9 @@ func (d *dataDescriptor) ReadFrom(r io.Reader) (int64, error) {
 		rr = bytes.NewReader(buf[:size])
 	}
 
-	byteio.GetUint32LE(rr, &d.CRC32)
-	byteio.GetUint32LE(rr, &d.CompressedSize)
-	byteio.GetUint32LE(rr, &d.UncompressedSize)
+	byteio.GetUint32LE(rr, &d.crc32)
+	byteio.GetUint32LE(rr, &d.compressedSize)
+	byteio.GetUint32LE(rr, &d.uncompressedSize)
 
 	return int64(size), nil
 }
@@ -424,9 +435,9 @@ func (d *dataDescriptor) ReadFrom(r io.Reader) (int64, error) {
 func (d *dataDescriptor) WriteTo(w io.Writer) (int64, error) {
 	buf := new(bytes.Buffer)
 	buf.Write([]byte(signDataDescriptor))
-	byteio.WriteUint32LE(buf, d.CRC32)
-	byteio.WriteUint32LE(buf, d.CompressedSize)
-	byteio.WriteUint32LE(buf, d.UncompressedSize)
+	byteio.WriteUint32LE(buf, d.crc32)
+	byteio.WriteUint32LE(buf, d.compressedSize)
+	byteio.WriteUint32LE(buf, d.uncompressedSize)
 
 	if _, err := w.Write(buf.Bytes()); err != nil {
 		return 0, err
@@ -436,10 +447,13 @@ func (d *dataDescriptor) WriteTo(w io.Writer) (int64, error) {
 
 // endCentralDirectory represents an end of central directory record in the ZIP specification.
 type endCentralDirectory struct {
-	numberOfEntries          uint16 // total number of entries in the central directory on this disk
+	numberOfDisk             uint16 // number of this disk
+	numberOfStartDirDisk     uint16 // number of the disk with the start of the central directory.
+	numberOfEntriesThisDisk  uint16 // total number of entries in the central directory on this disk
+	numberOfEntries          uint16 // total number of entries in the central directory
 	sizeOfCentralDirectories uint32 // size of the central directory block
 	offsetCentralDirectory   uint32 // offset of start of central directory with respect to the starting disk number
-	Comment                  string // zip archive comment
+	comment                  []byte // zip archive comment
 }
 
 // ReadFrom reads an end of central directory record from io.Reader.
@@ -456,31 +470,28 @@ func (e *endCentralDirectory) ReadFrom(r io.Reader) (int64, error) {
 	if _, err := r.Read(buf[:]); err != nil {
 		return 0, err
 	}
-	rr := bytes.NewReader(buf[:])
+
 	var (
-		numThisDisk      uint16
-		numStartDirDisk  uint16
-		numEntriesInDisk uint16
-		commentSize      uint16
+		commentSize uint16
 	)
-	byteio.GetUint16LE(rr, &numThisDisk)
-	byteio.GetUint16LE(rr, &numStartDirDisk)
-	byteio.GetUint16LE(rr, &numEntriesInDisk)
+	rr := bytes.NewReader(buf[:])
+	byteio.GetUint16LE(rr, &e.numberOfDisk)
+	byteio.GetUint16LE(rr, &e.numberOfStartDirDisk)
+	byteio.GetUint16LE(rr, &e.numberOfEntriesThisDisk)
 	byteio.GetUint16LE(rr, &e.numberOfEntries)
 	byteio.GetUint32LE(rr, &e.sizeOfCentralDirectories)
 	byteio.GetUint32LE(rr, &e.offsetCentralDirectory)
 	byteio.GetUint16LE(rr, &commentSize)
 
-	if numThisDisk != 0 || numStartDirDisk != 0 || numEntriesInDisk != e.numberOfEntries {
+	if e.numberOfDisk != 0 || e.numberOfStartDirDisk != 0 || e.numberOfEntriesThisDisk != e.numberOfEntries {
 		return 0, errors.New("unsupport split zip file")
 	}
 
+	e.comment = make([]byte, commentSize)
 	if commentSize != 0 {
-		commentBuf := make([]byte, commentSize)
-		if _, err := r.Read(commentBuf); err != nil {
+		if _, err := r.Read(e.comment); err != nil {
 			return 0, err
 		}
-		e.Comment = string(commentBuf)
 	}
 
 	size := int(sizeEndCentralDirectory) + int(commentSize)
@@ -491,26 +502,21 @@ func (e *endCentralDirectory) ReadFrom(r io.Reader) (int64, error) {
 func (e *endCentralDirectory) WriteTo(w io.Writer) (int64, error) {
 	buf := new(bytes.Buffer)
 	w.Write([]byte(signEndCentralDirectory))
-	byteio.WriteUint16LE(buf, 0)
-	byteio.WriteUint16LE(buf, 0)
-	byteio.WriteUint16LE(buf, e.numberOfEntries)
+	byteio.WriteUint16LE(buf, e.numberOfDisk)
+	byteio.WriteUint16LE(buf, e.numberOfStartDirDisk)
+	byteio.WriteUint16LE(buf, e.numberOfEntriesThisDisk)
 	byteio.WriteUint16LE(buf, e.numberOfEntries)
 	byteio.WriteUint32LE(buf, e.sizeOfCentralDirectories)
 	byteio.WriteUint32LE(buf, e.offsetCentralDirectory)
-	byteio.WriteUint16LE(buf, uint16(len(e.Comment)))
+	byteio.WriteUint16LE(buf, uint16(len(e.comment)))
+	buf.Write(e.comment)
 
-	if _, err := buf.Write([]byte(e.Comment)); err != nil {
-		return 0, err
-	}
-
-	if _, err := w.Write(buf.Bytes()); err != nil {
-		return 0, err
-	}
-	return int64(buf.Len()), nil
+	n, err := w.Write(buf.Bytes())
+	return int64(n), err
 }
 
-// uint32ToUTCTime converts a date/time in uint32 format to time.Time format.
-func uint32ToUTCTime(dates uint16, times uint16) time.Time {
+// uint16ToDosTime converts a date/time in uint16 to a MS-DOS time.
+func uint16ToDosTime(dates uint16, times uint16) time.Time {
 	if dates == 0 && times == 0 {
 		return time.Time{}
 	}
@@ -528,8 +534,8 @@ func uint32ToUTCTime(dates uint16, times uint16) time.Time {
 	return time.Date(year, time.Month(monh), days, hour, mins, secs, 0, time.UTC)
 }
 
-// utcTimeToUint32 converts time.Time format to uint32 format date/time.
-func utcTimeToUint32(t time.Time) (dates uint16, times uint16) {
+// uint16FromDosTime converts a MS-DOS time to a date/time in uint16.
+func uint16FromDosTime(t time.Time) (dates uint16, times uint16) {
 	if t.IsZero() || t.Year() < 1980 {
 		return 0, 0
 	}

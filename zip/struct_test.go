@@ -62,8 +62,8 @@ func Test_localFileHeader(t *testing.T) {
 		02 01 78 56 34 12 09 ef cd ab 08 00 06 00 66 69
 		6c 65 6e 61 6d 65 ff ee 02 00 00 00
 	`)
-	expect := localFileHeader{
-		RequireVersion:   0x0014,
+	expect := &FileHeader{
+		MinimumVersion:   0x0014,
 		Flags:            FlagType{DataDescriptor: true},
 		Method:           &MethodDeflated{DefaultCompression},
 		ModifiedTime:     time.Date(2022, time.Month(5), 6, 12, 34, 56, 0, time.UTC),
@@ -82,13 +82,18 @@ func Test_localFileHeader(t *testing.T) {
 	{
 		r := bytes.NewReader(src)
 
-		h := new(localFileHeader)
-		if _, err := h.ReadFrom(r); err != nil {
-			t.Fatal(err)
+		fh := new(localFileHeader)
+		if _, err := fh.ReadFrom(r); err != nil {
+			t.Fatalf("ReadFrom: %v", err)
 		}
 
-		if h.RequireVersion != expect.RequireVersion {
-			t.Errorf("RequireVersion=%x, want=%x", h.RequireVersion, expect.RequireVersion)
+		h := new(FileHeader)
+		if err := fh.copyToHeader(h); err != nil {
+			t.Fatalf("copyToHeader: %v", err)
+		}
+
+		if h.MinimumVersion != expect.MinimumVersion {
+			t.Errorf("MinimumVersion=%x, want=%x", h.MinimumVersion, expect.MinimumVersion)
 		}
 		if h.Flags.get() != expect.Flags.get() {
 			t.Errorf("Flags=%#v, want=%#v", h.Flags, expect.Flags)
@@ -118,8 +123,13 @@ func Test_localFileHeader(t *testing.T) {
 	}
 
 	{
+		fh := new(localFileHeader)
+		if err := fh.copyFromHeader(expect); err != nil {
+			t.Fatalf("copyFromHeader: %v", err)
+		}
+
 		w := new(bytes.Buffer)
-		if _, err := expect.WriteTo(w); err != nil {
+		if _, err := fh.WriteTo(w); err != nil {
 			t.Fatal(err)
 		}
 		dst := w.Bytes()
@@ -143,43 +153,49 @@ func Test_centralDirectoryHeader(t *testing.T) {
 		6c 65 6e 61 6d 65 ff ee 02 00 00 00 63 6F 6D 6D
 		65 6E 74
 	`)
-	expect := centralDirectoryHeader{
-		localFileHeader: localFileHeader{
-			RequireVersion:   0x0014,
-			Flags:            FlagType{DataDescriptor: true},
-			Method:           &MethodDeflated{DefaultCompression},
-			ModifiedTime:     time.Date(2022, time.Month(5), 6, 12, 34, 56, 0, time.UTC),
-			CRC32:            0x01020304,
-			CompressedSize:   0x12345678,
-			UncompressedSize: 0xabcdef09,
-			FileName:         "filename",
-			ExtraFields: []ExtraField{
-				&ExtraUnknown{
-					tag:  0xeeff,
-					Data: hexToBytes("ff ee 02 00 00 00"),
-				},
+	expect := &FileHeader{
+		MinimumVersion:   0x0014,
+		GenerateVersion:  0x20,
+		GenerateOS:       OS_MSDOS,
+		Flags:            FlagType{DataDescriptor: true},
+		Method:           &MethodDeflated{DefaultCompression},
+		ModifiedTime:     time.Date(2022, time.Month(5), 6, 12, 34, 56, 0, time.UTC),
+		CRC32:            0x01020304,
+		CompressedSize:   0x12345678,
+		UncompressedSize: 0xabcdef09,
+		FileName:         "filename",
+		ExtraFields: []ExtraField{
+			&ExtraUnknown{
+				tag:  0xeeff,
+				Data: hexToBytes("ff ee 02 00 00 00"),
 			},
 		},
-		GenerateVersion:   0x0020,
-		InternalFileAttr:  0x0001,
-		ExternalFileAttr:  0x0003,
-		LocalHeaderOffset: 0x0fb9,
-		Comment:           "comment",
+		InternalFileAttr: 0x0001,
+		ExternalFileAttr: 0x0003,
+		Comment:          "comment",
 	}
 
 	{
 		r := bytes.NewReader(src)
 
-		h := new(centralDirectoryHeader)
-		if _, err := h.ReadFrom(r); err != nil {
-			t.Fatal(err)
+		dh := new(centralDirectoryHeader)
+		if _, err := dh.ReadFrom(r); err != nil {
+			t.Fatalf("ReadFrom: %v", err)
 		}
 
+		h := new(FileHeader)
+		if err := dh.copyToHeader(h); err != nil {
+			t.Fatalf("copyToHeader: %v", err)
+		}
+
+		if h.MinimumVersion != expect.MinimumVersion {
+			t.Errorf("RequireVersion=%x, want=%x", h.MinimumVersion, expect.MinimumVersion)
+		}
 		if h.GenerateVersion != expect.GenerateVersion {
 			t.Errorf("GenerateVersion=%x, want=%x", h.GenerateVersion, expect.GenerateVersion)
 		}
-		if h.RequireVersion != expect.RequireVersion {
-			t.Errorf("RequireVersion=%x, want=%x", h.RequireVersion, expect.RequireVersion)
+		if h.GenerateOS != expect.GenerateOS {
+			t.Errorf("GenerateOS=%x, want=%x", h.GenerateOS, expect.GenerateOS)
 		}
 		if h.Flags.get() != expect.Flags.get() {
 			t.Errorf("Flags=%v, want=%v", h.Flags, expect.Flags)
@@ -216,14 +232,16 @@ func Test_centralDirectoryHeader(t *testing.T) {
 		if h.ExternalFileAttr != expect.ExternalFileAttr {
 			t.Errorf("ExternalFileAttr=%x, want=%x", h.ExternalFileAttr, expect.ExternalFileAttr)
 		}
-		if h.LocalHeaderOffset != expect.LocalHeaderOffset {
-			t.Errorf("LocalHeaderOffset=%x, want=%x", h.LocalHeaderOffset, expect.LocalHeaderOffset)
-		}
 	}
 
 	{
+		dh := new(centralDirectoryHeader)
+		if err := dh.copyToHeader(expect); err != nil {
+			t.Fatalf("copyToHeader: %v", err)
+		}
+
 		w := new(bytes.Buffer)
-		if _, err := expect.WriteTo(w); err != nil {
+		if _, err := dh.WriteTo(w); err != nil {
 			t.Fatal(err)
 		}
 		dst := w.Bytes()
@@ -249,9 +267,9 @@ func Test_dataDescriptor(t *testing.T) {
 				50 4b 07 08 04 03 02 01 4f 3f 2f 1f 8f 7f 6f 5f
 			`),
 			expect: dataDescriptor{
-				CRC32:            0x01020304,
-				CompressedSize:   0x1f2f3f4f,
-				UncompressedSize: 0x5f6f7f8f,
+				crc32:            0x01020304,
+				compressedSize:   0x1f2f3f4f,
+				uncompressedSize: 0x5f6f7f8f,
 			},
 		},
 		{
@@ -259,9 +277,9 @@ func Test_dataDescriptor(t *testing.T) {
 				04 03 02 01 4f 3f 2f 1f 8f 7f 6f 5f
 			`),
 			expect: dataDescriptor{
-				CRC32:            0x01020304,
-				CompressedSize:   0x1f2f3f4f,
-				UncompressedSize: 0x5f6f7f8f,
+				crc32:            0x01020304,
+				compressedSize:   0x1f2f3f4f,
+				uncompressedSize: 0x5f6f7f8f,
 			},
 		},
 	}
@@ -272,16 +290,16 @@ func Test_dataDescriptor(t *testing.T) {
 			d := new(dataDescriptor)
 
 			if _, err := d.ReadFrom(r); err != nil {
-				t.Fatal(err)
+				t.Fatalf("ReadFrom: %v", err)
 			}
-			if d.CRC32 != tt.expect.CRC32 {
-				t.Errorf("CRC32=%x, want=%x", d.CRC32, tt.expect.CRC32)
+			if d.crc32 != tt.expect.crc32 {
+				t.Errorf("crc32=%x, want=%x", d.crc32, tt.expect.crc32)
 			}
-			if d.CompressedSize != tt.expect.CompressedSize {
-				t.Errorf("CompressedSize=%d, want=%d", d.CompressedSize, tt.expect.CompressedSize)
+			if d.compressedSize != tt.expect.compressedSize {
+				t.Errorf("compressedSize=%d, want=%d", d.compressedSize, tt.expect.compressedSize)
 			}
-			if d.UncompressedSize != tt.expect.UncompressedSize {
-				t.Errorf("UncompressedSize=%d, want=%d", d.UncompressedSize, tt.expect.UncompressedSize)
+			if d.uncompressedSize != tt.expect.uncompressedSize {
+				t.Errorf("uncompressedSize=%d, want=%d", d.uncompressedSize, tt.expect.uncompressedSize)
 			}
 		}
 
@@ -292,7 +310,7 @@ func Test_dataDescriptor(t *testing.T) {
 		{
 			w := new(bytes.Buffer)
 			if _, err := tt.expect.WriteTo(w); err != nil {
-				t.Fatal(err)
+				t.Fatalf("WriteTo: %v", err)
 			}
 			dst := w.Bytes()
 
@@ -314,10 +332,13 @@ func Test_endCentralDirectory(t *testing.T) {
 		20 10 00 00 07 00 63 6F 6D 6D 65 6E 74
 	`)
 	expect := endCentralDirectory{
+		numberOfDisk:             0,
+		numberOfStartDirDisk:     0,
+		numberOfEntriesThisDisk:  10,
 		numberOfEntries:          10,
 		sizeOfCentralDirectories: 0x5678,
 		offsetCentralDirectory:   0x1020,
-		Comment:                  "comment",
+		comment:                  []byte("comment"),
 	}
 
 	{
@@ -328,6 +349,15 @@ func Test_endCentralDirectory(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		if h.numberOfDisk != expect.numberOfDisk {
+			t.Errorf("numberOfDisk=%d, want=%d", h.numberOfDisk, expect.numberOfDisk)
+		}
+		if h.numberOfStartDirDisk != expect.numberOfStartDirDisk {
+			t.Errorf("numberOfStartDirDisk=%d, want=%d", h.numberOfStartDirDisk, expect.numberOfStartDirDisk)
+		}
+		if h.numberOfEntriesThisDisk != expect.numberOfEntriesThisDisk {
+			t.Errorf("numberOfEntriesThisDisk=%d, want=%d", h.numberOfEntriesThisDisk, expect.numberOfEntriesThisDisk)
+		}
 		if h.numberOfEntries != expect.numberOfEntries {
 			t.Errorf("numberOfEntries=%d, want=%d", h.numberOfEntries, expect.numberOfEntries)
 		}
@@ -337,8 +367,8 @@ func Test_endCentralDirectory(t *testing.T) {
 		if h.offsetCentralDirectory != expect.offsetCentralDirectory {
 			t.Errorf("offsetCentralDirectory=%d, want=%d", h.offsetCentralDirectory, expect.offsetCentralDirectory)
 		}
-		if h.Comment != expect.Comment {
-			t.Errorf("Comment=%q, want=%q", h.Comment, expect.Comment)
+		if string(h.comment) != string(expect.comment) {
+			t.Errorf("Comment=%q, want=%q", string(h.comment), string(expect.comment))
 		}
 	}
 
