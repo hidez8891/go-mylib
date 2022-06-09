@@ -3,6 +3,7 @@ package zip
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 )
@@ -41,7 +42,7 @@ func (r *Reader) init() error {
 	if _, err := enddir.ReadFrom(r.r); err != nil {
 		return err
 	}
-	r.Comment = enddir.Comment
+	r.Comment = string(enddir.comment)
 
 	r.Files = make([]*File, enddir.numberOfEntries)
 	if _, err := r.r.Seek(int64(enddir.offsetCentralDirectory), io.SeekStart); err != nil {
@@ -52,7 +53,11 @@ func (r *Reader) init() error {
 		if _, err := cdir.ReadFrom(r.r); err != nil {
 			return err
 		}
-		r.Files[i] = newFile(r.r, cdir)
+
+		r.Files[i], err = newFile(r.r, cdir)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -60,21 +65,23 @@ func (r *Reader) init() error {
 
 // File represents a single file in zip archive.
 type File struct {
-	localFileHeader
-
-	r       io.ReadSeeker
-	cdir    *centralDirectoryHeader
+	FileHeader
 	Comment string
+
+	r      io.ReadSeeker
+	offset uint32
 }
 
 // newFile returns zip.File that reads from io.ReadSeeker.
-func newFile(r io.ReadSeeker, cdir *centralDirectoryHeader) *File {
-	return &File{
-		localFileHeader: cdir.localFileHeader,
-		r:               r,
-		cdir:            cdir,
-		Comment:         cdir.Comment,
+func newFile(r io.ReadSeeker, cdir *centralDirectoryHeader) (*File, error) {
+	file := &File{
+		Comment: string(cdir.comment),
+		r:       r,
+		offset:  cdir.localHeaderOffset,
 	}
+
+	err := cdir.copyToHeader(&file.FileHeader)
+	return file, err
 }
 
 // Open returns io.ReadCloser, which reads from the decompressed contents.
@@ -84,12 +91,12 @@ func (f *File) Open() (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	return f.cdir.Method.newDecompressor(r)
+	return f.Method.newDecompressor(r)
 }
 
 // Open returns io.ReadCloser, which reads from the compressed contents.
 func (f *File) OpenRaw() (io.ReadCloser, error) {
-	if _, err := f.r.Seek(int64(f.cdir.LocalHeaderOffset), io.SeekStart); err != nil {
+	if _, err := f.r.Seek(int64(f.offset), io.SeekStart); err != nil {
 		return nil, err
 	}
 
@@ -98,11 +105,11 @@ func (f *File) OpenRaw() (io.ReadCloser, error) {
 		return nil, err
 	}
 	// simple name check
-	if f.cdir.FileName != h.FileName {
-		return nil, errors.New("broken zip: file name is different")
+	if f.FileName != string(h.fileName) {
+		return nil, fmt.Errorf("broken zip: file name is different %q", f.FileName)
 	}
 
-	r := io.LimitReader(f.r, int64(f.cdir.CompressedSize))
+	r := io.LimitReader(f.r, int64(f.CompressedSize))
 	return &nopReadCloser{r}, nil
 }
 
