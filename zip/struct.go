@@ -76,6 +76,33 @@ const (
 	OS_OSX   OSType = 19 // OSX
 )
 
+// Experimental: ExternalFileAttribute represents external file attributes.
+// ref: https://unix.stackexchange.com/questions/14705/the-zip-formats-external-file-attribute
+type ExternalFileAttribute uint32
+
+// Unix returns Unix file attributes.
+func (e ExternalFileAttribute) Unix() uint16 {
+	// file type : 4bit
+	// setuid    : 1bit
+	// setgid    : 1bit
+	// sticky    : 1bit
+	// owner     : 3bit
+	// group     : 3bit
+	// other     : 3bit
+	return uint16(e >> 16)
+}
+
+// Dos returns DOS file attributes.
+func (e ExternalFileAttribute) Dos() uint16 {
+	// archive   : 1bit
+	// directory : 1bit
+	// [unknown] : 1bit
+	// system    : 1bit
+	// hidden    : 1bit
+	// read-only : 1bit
+	return uint16(e & 0x3F)
+}
+
 const (
 	signLocalFileHeader        string = "PK\x03\x04" // signature of a local file header
 	signCentralDirectoryHeader string = "PK\x01\x02" // signature of a central directory header
