@@ -9,6 +9,7 @@ import (
 	"go-mylib/byteio"
 )
 
+// FileHeader represents a file header in a zip file.
 type FileHeader struct {
 	MinimumVersion   int          // version needed to extract the file
 	GenerateVersion  int          // version used to generate the file
@@ -24,6 +25,16 @@ type FileHeader struct {
 	InternalFileAttr uint16       // internal file attributes
 	ExternalFileAttr uint32       // external file attributes
 	Comment          string       // file comment
+}
+
+// NewFileHeader creates a new FileHeader.
+func NewFileHeader(name string) *FileHeader {
+	return &FileHeader{
+		Method:       &MethodDeflated{DefaultCompression},
+		ModifiedTime: time.Now(),
+		FileName:     name,
+		ExtraFields:  make([]ExtraField, 0),
+	}
 }
 
 const (
@@ -181,11 +192,19 @@ func (h *localFileHeader) copyFromHeader(fh *FileHeader) error {
 	h.flag = fh.Flags.get() | fh.Method.get()
 	h.method = fh.Method.ID()
 	h.moddate, h.modtime = uint16FromDosTime(fh.ModifiedTime)
-	h.crc32 = fh.CRC32
-	h.compressedSize = fh.CompressedSize
-	h.uncompressedSize = fh.UncompressedSize
+	if fh.Flags.DataDescriptor {
+		// if data descriptor is set, crc32 and comp/uncompressed size are must be 0
+		h.crc32 = 0
+		h.compressedSize = 0
+		h.uncompressedSize = 0
+	} else {
+		h.crc32 = fh.CRC32
+		h.compressedSize = fh.CompressedSize
+		h.uncompressedSize = fh.UncompressedSize
+	}
 	h.fileName = []byte(fh.FileName)
-	h.extraFields = extras.Bytes()
+	// local file header extra field is should be empty
+	h.extraFields = make([]byte, 0)
 
 	return nil
 }
@@ -357,6 +376,8 @@ func (h *centralDirectoryHeader) copyFromHeader(fh *FileHeader) error {
 	h.uncompressedSize = fh.UncompressedSize
 	h.fileName = []byte(fh.FileName)
 	h.extraFields = extras.Bytes()
+	h.internalFileAttr = fh.InternalFileAttr
+	h.externalFileAttr = fh.ExternalFileAttr
 	h.comment = []byte(fh.Comment)
 
 	return nil
