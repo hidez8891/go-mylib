@@ -31,7 +31,7 @@ type FileHeader struct {
 func NewFileHeader(name string) *FileHeader {
 	return &FileHeader{
 		Method:       &MethodDeflated{DefaultCompression},
-		ModifiedTime: time.Now(),
+		ModifiedTime: time.Time{},
 		FileName:     name,
 		ExtraFields:  make([]ExtraField, 0),
 	}
