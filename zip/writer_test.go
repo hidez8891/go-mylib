@@ -31,13 +31,15 @@ func testWriter(t *testing.T, tt testcase) {
 	}
 	zw.Comment = tt.zipcomment
 
-	fw, err := zw.Create(tt.filename)
+	fh := NewFileHeader(tt.filename)
+	fh.Flags = tt.flags
+	fh.ModifiedTime = tt.mtime
+	fh.Comment = tt.comment
+
+	fw, err := zw.CreateFromHeader(fh)
 	if err != nil {
 		t.Fatalf("Writer.Create error=%#v", err)
 	}
-	fw.Flags = tt.flags
-	fw.ModifiedTime = tt.mtime
-	fw.Comment = tt.comment
 
 	if _, err := fw.Write([]byte(tt.content)); err != nil {
 		t.Fatalf("FileWriter.Write error=%#v", err)
@@ -85,7 +87,6 @@ func TestWriterAutoClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Writer.Create error=%#v", err)
 	}
-	fw.ModifiedTime = tt.mtime
 
 	if _, err := fw.Write([]byte(tt.content)); err != nil {
 		t.Fatalf("FileWriter.Write error=%#v", err)

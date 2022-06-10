@@ -8,14 +8,13 @@ import (
 	"io"
 	"io/fs"
 	"strings"
-	"time"
 )
 
 // Writer creates a zip file.
 type Writer struct {
 	w    io.WriteSeeker
 	dirs []*centralDirectoryHeader
-	pre  *FileWriter
+	pre  *fileWriter
 
 	Comment string
 }
@@ -28,19 +27,37 @@ func NewWriter(w io.WriteSeeker) (*Writer, error) {
 	}, nil
 }
 
-// Create returns zip.FileWriter that creates a file with name.
-// If the previous FileWriter has not called Close, it is forced to close.
-func (w *Writer) Create(name string) (*FileWriter, error) {
+// Create returns io.WriteCloser that creates a file with name.
+// If the previous io.WriteCloser has not called Close, it is forced to close.
+func (w *Writer) Create(name string) (io.WriteCloser, error) {
+	fh := NewFileHeader(name)
+	return w.CreateFromHeader(fh)
+}
+
+// CreateFromHeader returns io.WriteCloser that creates a file with name.
+// If the previous io.WriteCloser has not called Close, it is forced to close.
+func (w *Writer) CreateFromHeader(fh *FileHeader) (io.WriteCloser, error) {
 	if err := w.closePreviousFile(); err != nil {
 		return nil, err
 	}
 
-	namesize := len(name)
-	if strings.HasSuffix(name, "/") {
+	// update file header
+	fh.MinimumVersion = 20
+	fh.GenerateVersion = 20
+	fh.GenerateOS = OS_MSDOS
+	fh.CRC32 = 0            // update by FileWriter
+	fh.CompressedSize = 0   // update by FileWriter
+	fh.UncompressedSize = 0 // update by FileWriter
+
+	namesize := len(fh.FileName)
+	if strings.HasSuffix(fh.FileName, "/") {
 		namesize -= 1
+
+		// directory is only allowed Store method
+		fh.Method = &MethodStore{}
 	}
-	if ok := fs.ValidPath(name[:namesize]); !ok {
-		return nil, fmt.Errorf("file name is invalid: %q", name)
+	if ok := fs.ValidPath(fh.FileName[:namesize]); !ok {
+		return nil, fmt.Errorf("file name is invalid: %q", fh.FileName)
 	}
 
 	offset, err := w.w.Seek(0, io.SeekCurrent)
@@ -48,28 +65,19 @@ func (w *Writer) Create(name string) (*FileWriter, error) {
 		return nil, err
 	}
 
-	h := &centralDirectoryHeader{
-		localFileHeader: localFileHeader{
-			RequireVersion: newVersionType(20), // require deflate compression
-			Flags:          FlagType{},
-			Method:         &MethodDeflated{DefaultCompression},
-			ModifiedTime:   time.Now(),
-			FileName:       name,
-		},
-		GenerateVersion:   newVersionType(20),
-		LocalHeaderOffset: uint32(offset),
+	h := &centralDirectoryHeader{}
+	if err := h.copyFromHeader(fh); err != nil {
+		return nil, err
 	}
+	h.localHeaderOffset = uint32(offset)
 
-	if strings.HasSuffix(name, "/") {
-		// directory is only allowed Store method
-		h.Method = &MethodStore{}
+	fw := &fileWriter{
+		w: w.w,
+		h: h,
 	}
 
 	w.dirs = append(w.dirs, h)
-
-	fw := newFileWriter(w.w, h)
 	w.pre = fw
-
 	return fw, nil
 }
 
@@ -110,10 +118,11 @@ func (w *Writer) writeCentralDirectories() error {
 	}
 
 	end := &endCentralDirectory{
+		numberOfEntriesThisDisk:  uint16(len(w.dirs)),
 		numberOfEntries:          uint16(len(w.dirs)),
 		sizeOfCentralDirectories: uint32(endOffset - startOffset),
 		offsetCentralDirectory:   uint32(startOffset),
-		Comment:                  w.Comment,
+		comment:                  []byte(w.Comment),
 	}
 
 	if _, err := end.WriteTo(w.w); err != nil {
@@ -122,44 +131,23 @@ func (w *Writer) writeCentralDirectories() error {
 	return nil
 }
 
-// FileWriter implements a io.Writer that compresses and writes data.
-type FileWriter struct {
-	w io.WriteSeeker // raw Writer
-	h *centralDirectoryHeader
+// fileWriter implements a io.Writer that compresses and writes data.
+type fileWriter struct {
+	w io.WriteSeeker          // raw Writer
+	h *centralDirectoryHeader // reference to central directory header
 
 	compCounter   *CountWriter   // compress size counter
 	compWriter    io.WriteCloser // compress Writer
 	uncompCounter *CountWriter   // uncompress size counter
 	crc32         hash.Hash32    // hash calclator
 	fw            io.Writer      // file data Writer
+	fh            *FileHeader
 	initialized   bool
 	closed        bool
-
-	Flags        FlagType   // file flags
-	Method       MethodType // file compression method
-	ModifiedTime time.Time  // file modified time
-	Comment      string     // file comment
-}
-
-// newFileWriter returns zip.FileWriter that writes to io.WriteSeeker.
-func newFileWriter(w io.WriteSeeker, h *centralDirectoryHeader) *FileWriter {
-	return &FileWriter{
-		w: w,
-		h: h,
-
-		Flags:        h.Flags,
-		Method:       h.Method,
-		ModifiedTime: h.ModifiedTime,
-	}
-}
-
-// Name returns the file name.
-func (fw *FileWriter) Name() string {
-	return fw.h.FileName
 }
 
 // Write compresses and writes []byte.
-func (fw *FileWriter) Write(p []byte) (int, error) {
+func (fw *fileWriter) Write(p []byte) (int, error) {
 	if !fw.initialized {
 		fw.writeInit()
 	}
@@ -169,7 +157,7 @@ func (fw *FileWriter) Write(p []byte) (int, error) {
 
 // Close flushes the write data and closes zip.FileWriter.
 // If FlagDataDescriptor is not set, the file header is rewritten.
-func (fw *FileWriter) Close() error {
+func (fw *fileWriter) Close() error {
 	if fw.closed {
 		return errors.New("already closed")
 	}
@@ -179,35 +167,38 @@ func (fw *FileWriter) Close() error {
 		if err := fw.compWriter.Close(); err != nil {
 			return err
 		}
-		fw.h.CRC32 = fw.crc32.Sum32()
-		fw.h.CompressedSize = uint32(fw.compCounter.Count)
-		fw.h.UncompressedSize = uint32(fw.uncompCounter.Count)
-		fw.h.Comment = fw.Comment
+		fw.fh.CRC32 = fw.crc32.Sum32()
+		fw.fh.CompressedSize = uint32(fw.compCounter.Count)
+		fw.fh.UncompressedSize = uint32(fw.uncompCounter.Count)
+	}
+	if err := fw.h.copyFromHeader(fw.fh); err != nil {
+		return err
 	}
 
-	if fw.h.Flags.DataDescriptor {
+	if fw.fh.Flags.DataDescriptor {
 		return fw.writeDataDescriptor()
 	} else {
 		return fw.rewriteFileHeader()
 	}
 }
 
-// IsClosed returns whether the FileWriter is closed.
-func (fw *FileWriter) IsClosed() bool {
+// IsClosed returns whether the fileWriter is closed.
+func (fw *fileWriter) IsClosed() bool {
 	return fw.closed
 }
 
 // writeInit performs the preprocessing for writing and write the file header.
-func (fw *FileWriter) writeInit() error {
+func (fw *fileWriter) writeInit() error {
 	var err error
 	fw.initialized = true
 
-	fw.h.Flags = fw.Flags
-	fw.h.Method = fw.Method
-	fw.h.ModifiedTime = fw.ModifiedTime
+	fw.fh = &FileHeader{}
+	if err := fw.h.copyToHeader(fw.fh); err != nil {
+		return err
+	}
 
 	fw.compCounter = &CountWriter{w: fw.w}
-	fw.compWriter, err = fw.h.Method.newCompressor(fw.compCounter)
+	fw.compWriter, err = fw.fh.Method.newCompressor(fw.compCounter)
 	if err != nil {
 		return err
 	}
@@ -223,31 +214,34 @@ func (fw *FileWriter) writeInit() error {
 }
 
 // writeFileHeader writes the file header.
-func (fw *FileWriter) writeFileHeader() error {
-	_, err := fw.h.localFileHeader.WriteTo(fw.w)
+func (fw *fileWriter) writeFileHeader() error {
+	h := new(localFileHeader)
+	if err := h.copyFromHeader(fw.fh); err != nil {
+		return err
+	}
+	_, err := h.WriteTo(fw.w)
 	return err
 }
 
 // writeDataDescriptor writes the data descriptor.
-func (fw *FileWriter) writeDataDescriptor() error {
+func (fw *fileWriter) writeDataDescriptor() error {
 	dd := new(dataDescriptor)
-	dd.CRC32 = fw.h.CRC32
-	dd.CompressedSize = fw.h.CompressedSize
-	dd.UncompressedSize = fw.h.UncompressedSize
+	dd.crc32 = fw.fh.CRC32
+	dd.compressedSize = fw.fh.CompressedSize
+	dd.uncompressedSize = fw.fh.UncompressedSize
 
 	_, err := dd.WriteTo(fw.w)
 	return err
 }
 
 // rewriteFileHeader rewrites the file header.
-func (fw *FileWriter) rewriteFileHeader() error {
+func (fw *fileWriter) rewriteFileHeader() error {
 	current, err := fw.w.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return err
 	}
 
-	offset := fw.h.LocalHeaderOffset
-	if _, err := fw.w.Seek(int64(offset), io.SeekStart); err != nil {
+	if _, err := fw.w.Seek(int64(fw.h.localHeaderOffset), io.SeekStart); err != nil {
 		return err
 	}
 	if err := fw.writeFileHeader(); err != nil {
