@@ -81,6 +81,59 @@ func (w *Writer) CreateFromHeader(fh *FileHeader) (io.WriteCloser, error) {
 	return fw, nil
 }
 
+// Copy copies the zip.File to the writer.
+func (w *Writer) Copy(f *File) error {
+	if err := w.closePreviousFile(); err != nil {
+		return err
+	}
+
+	offset, err := w.w.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+
+	h := &centralDirectoryHeader{}
+	if err := h.copyFromHeader(&f.FileHeader); err != nil {
+		return err
+	}
+	h.localHeaderOffset = uint32(offset)
+
+	// write local file header
+	lh := &localFileHeader{}
+	if err := lh.copyFromHeader(&f.FileHeader); err != nil {
+		return err
+	}
+	if _, err := lh.WriteTo(w.w); err != nil {
+		return err
+	}
+
+	// write raw payload
+	r, err := f.OpenRaw()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	if _, err := io.Copy(w.w, r); err != nil {
+		return err
+	}
+
+	// write data descriptor
+	if f.Flags.DataDescriptor {
+		dd := &dataDescriptor{
+			crc32:            f.CRC32,
+			compressedSize:   f.CompressedSize,
+			uncompressedSize: f.UncompressedSize,
+		}
+		if _, err := dd.WriteTo(w.w); err != nil {
+			return err
+		}
+	}
+
+	w.dirs = append(w.dirs, h)
+	w.pre = nil
+	return nil
+}
+
 // Close flushes the write data and closes zip.Writer.
 // If the previous FileWriter has not called Close, it is forced to close.
 func (w *Writer) Close() error {

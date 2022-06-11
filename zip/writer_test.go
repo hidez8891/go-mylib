@@ -3,17 +3,18 @@ package zip
 import (
 	"go-mylib/buffer"
 	"io/ioutil"
+	"os"
 	"testing"
 )
 
-var wtests = []string{
-	"data-descriptor",
-	"no-data-descriptor",
-	"comment",
-	"empty-mtime",
-}
-
 func TestWriter(t *testing.T) {
+	var wtests = []string{
+		"data-descriptor",
+		"no-data-descriptor",
+		"comment",
+		"empty-mtime",
+	}
+
 	for _, name := range wtests {
 		tt := tests[name]
 		t.Run(name, func(t *testing.T) {
@@ -98,4 +99,48 @@ func TestWriterAutoClose(t *testing.T) {
 	// Reader read test
 	r := buffer.NewReader(buf)
 	testcaseCompare(t, r, tt)
+}
+
+func TestWriterCopy(t *testing.T) {
+	var wtests = []string{
+		"data-descriptor",
+		"no-data-descriptor",
+		"comment",
+	}
+
+	for _, name := range wtests {
+		tt := tests[name]
+		t.Run(name, func(t *testing.T) {
+			// open zip
+			r, err := os.Open("tests/" + tt.path)
+			if err != nil {
+				t.Fatalf("os.Open error=%#v", err)
+			}
+			defer r.Close()
+			zr, err := NewReader(r)
+			if err != nil {
+				t.Fatalf("NewReader error=%#v", err)
+			}
+
+			// copy test
+			buf := new(buffer.Buffer)
+			zw, err := NewWriter(buffer.NewWriter(buf))
+			if err != nil {
+				t.Fatalf("NewWriter error=%#v", err)
+			}
+			for _, file := range zr.Files {
+				if err := zw.Copy(file); err != nil {
+					t.Errorf("Copy error=%#v", err)
+				}
+			}
+			zw.Comment = zr.Comment
+			if err := zw.Close(); err != nil {
+				t.Fatalf("Writer.Close error=%#v", err)
+			}
+
+			// read test
+			rr := buffer.NewReader(buf)
+			testcaseCompare(t, rr, tt)
+		})
+	}
 }
