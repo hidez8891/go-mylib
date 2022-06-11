@@ -66,7 +66,6 @@ func (r *Reader) init() error {
 // File represents a single file in zip archive.
 type File struct {
 	FileHeader
-	Comment string
 
 	r      io.ReadSeeker
 	offset uint32
@@ -75,9 +74,8 @@ type File struct {
 // newFile returns zip.File that reads from io.ReadSeeker.
 func newFile(r io.ReadSeeker, cdir *centralDirectoryHeader) (*File, error) {
 	file := &File{
-		Comment: string(cdir.comment),
-		r:       r,
-		offset:  cdir.localHeaderOffset,
+		r:      r,
+		offset: cdir.localHeaderOffset,
 	}
 
 	err := cdir.copyToHeader(&file.FileHeader)
