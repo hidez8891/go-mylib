@@ -34,7 +34,7 @@ func (w *Writer) Create(name string) (io.WriteCloser, error) {
 	return w.CreateFromHeader(fh)
 }
 
-// CreateFromHeader returns io.WriteCloser that creates a file with name.
+// CreateFromHeader returns io.WriteCloser that creates a file with FileHeader.
 // If the previous io.WriteCloser has not called Close, it is forced to close.
 func (w *Writer) CreateFromHeader(fh *FileHeader) (io.WriteCloser, error) {
 	if err := w.closePreviousFile(); err != nil {
@@ -184,7 +184,7 @@ func (w *Writer) writeCentralDirectories() error {
 	return nil
 }
 
-// fileWriter implements a io.Writer that compresses and writes data.
+// fileWriter implements a io.WriteCloser that writes compressed data.
 type fileWriter struct {
 	w io.WriteSeeker          // raw Writer
 	h *centralDirectoryHeader // reference to central directory header
