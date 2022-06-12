@@ -35,6 +35,7 @@ func (w *Writer) Create(name string) (io.WriteCloser, error) {
 }
 
 // CreateFromHeader returns io.WriteCloser that creates a file with FileHeader.
+// This method updates the FileHeader. FileHeader is completed after Close is called.
 // If the previous io.WriteCloser has not called Close, it is forced to close.
 func (w *Writer) CreateFromHeader(fh *FileHeader) (io.WriteCloser, error) {
 	if err := w.closePreviousFile(); err != nil {
@@ -82,6 +83,7 @@ func (w *Writer) CreateFromHeader(fh *FileHeader) (io.WriteCloser, error) {
 }
 
 // Copy copies the zip.File to the writer.
+// This method does not modify the File argument.
 // If the previous io.WriteCloser has not called Close, it is forced to close.
 func (w *Writer) Copy(f *File) error {
 	r, err := f.OpenRaw()
@@ -94,6 +96,7 @@ func (w *Writer) Copy(f *File) error {
 }
 
 // CopyFromReader copies the io.Reader uncompressed data to the writer.
+// This method does not modify the FileHeader argument.
 // If the previous io.WriteCloser has not called Close, it is forced to close.
 func (w *Writer) CopyFromReader(fh *FileHeader, r io.Reader) error {
 	if err := w.closePreviousFile(); err != nil {
