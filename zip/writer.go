@@ -82,7 +82,20 @@ func (w *Writer) CreateFromHeader(fh *FileHeader) (io.WriteCloser, error) {
 }
 
 // Copy copies the zip.File to the writer.
+// If the previous io.WriteCloser has not called Close, it is forced to close.
 func (w *Writer) Copy(f *File) error {
+	r, err := f.OpenRaw()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	return w.CopyFromReader(&f.FileHeader, r)
+}
+
+// CopyFromReader copies the io.Reader uncompressed data to the writer.
+// If the previous io.WriteCloser has not called Close, it is forced to close.
+func (w *Writer) CopyFromReader(fh *FileHeader, r io.Reader) error {
 	if err := w.closePreviousFile(); err != nil {
 		return err
 	}
@@ -93,14 +106,14 @@ func (w *Writer) Copy(f *File) error {
 	}
 
 	h := &centralDirectoryHeader{}
-	if err := h.copyFromHeader(&f.FileHeader); err != nil {
+	if err := h.copyFromHeader(fh); err != nil {
 		return err
 	}
 	h.localHeaderOffset = uint32(offset)
 
 	// write local file header
 	lh := &localFileHeader{}
-	if err := lh.copyFromHeader(&f.FileHeader); err != nil {
+	if err := lh.copyFromHeader(fh); err != nil {
 		return err
 	}
 	if _, err := lh.WriteTo(w.w); err != nil {
@@ -108,21 +121,16 @@ func (w *Writer) Copy(f *File) error {
 	}
 
 	// write raw payload
-	r, err := f.OpenRaw()
-	if err != nil {
-		return err
-	}
-	defer r.Close()
 	if _, err := io.Copy(w.w, r); err != nil {
 		return err
 	}
 
 	// write data descriptor
-	if f.Flags.DataDescriptor {
+	if fh.Flags.DataDescriptor {
 		dd := &dataDescriptor{
-			crc32:            f.CRC32,
-			compressedSize:   f.CompressedSize,
-			uncompressedSize: f.UncompressedSize,
+			crc32:            fh.CRC32,
+			compressedSize:   fh.CompressedSize,
+			uncompressedSize: fh.UncompressedSize,
 		}
 		if _, err := dd.WriteTo(w.w); err != nil {
 			return err

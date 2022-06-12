@@ -144,3 +144,63 @@ func TestWriterCopy(t *testing.T) {
 		})
 	}
 }
+
+func TestWriterCopyFromReader(t *testing.T) {
+	var wtests = []struct {
+		src string
+		dst string
+	}{
+		{
+			src: "data-descriptor",
+			dst: "no-data-descriptor",
+		},
+	}
+
+	for _, test := range wtests {
+		src := tests[test.src]
+		dst := tests[test.dst]
+
+		t.Run(test.src, func(t *testing.T) {
+			// open file
+			r, err := os.Open("tests/" + src.path)
+			if err != nil {
+				t.Fatalf("os.Open error=%#v", err)
+			}
+			defer r.Close()
+			zr, err := NewReader(r)
+			if err != nil {
+				t.Fatalf("NewReader error=%#v", err)
+			}
+
+			// copy
+			buf := new(buffer.Buffer)
+			zw, err := NewWriter(buffer.NewWriter(buf))
+			if err != nil {
+				t.Fatalf("NewWriter error=%#v", err)
+			}
+			for _, file := range zr.Files {
+				// change FileHeader
+				fh := file.FileHeader
+				fh.Flags.DataDescriptor = false
+
+				// file copy
+				fr, err := file.OpenRaw()
+				if err != nil {
+					t.Fatalf("File.OpenRaw error=%#v", err)
+				}
+				if err := zw.CopyFromReader(&fh, fr); err != nil {
+					t.Errorf("Copy error=%#v", err)
+				}
+				fr.Close()
+			}
+			zw.Comment = zr.Comment
+			if err := zw.Close(); err != nil {
+				t.Fatalf("Writer.Close error=%#v", err)
+			}
+
+			// read test
+			rr := buffer.NewReader(buf)
+			testcaseCompare(t, rr, dst)
+		})
+	}
+}
