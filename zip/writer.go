@@ -200,9 +200,9 @@ type fileWriter struct {
 	w io.WriteSeeker          // raw Writer
 	h *centralDirectoryHeader // reference to central directory header
 
-	compCounter   *CountWriter   // compress size counter
+	compCounter   *countWriter   // compress size counter
 	compWriter    io.WriteCloser // compress Writer
-	uncompCounter *CountWriter   // uncompress size counter
+	uncompCounter *countWriter   // uncompress size counter
 	crc32         hash.Hash32    // hash calclator
 	fw            io.Writer      // file data Writer
 	fh            *FileHeader
@@ -261,12 +261,12 @@ func (fw *fileWriter) writeInit() error {
 		return err
 	}
 
-	fw.compCounter = &CountWriter{w: fw.w}
+	fw.compCounter = &countWriter{w: fw.w}
 	fw.compWriter, err = fw.fh.Method.newCompressor(fw.compCounter)
 	if err != nil {
 		return err
 	}
-	fw.uncompCounter = &CountWriter{w: fw.compWriter}
+	fw.uncompCounter = &countWriter{w: fw.compWriter}
 	fw.crc32 = crc32.NewIEEE()
 
 	fw.fw = io.MultiWriter(

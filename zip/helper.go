@@ -34,14 +34,14 @@ func (r *nopReadCloser) Close() error {
 	return nil
 }
 
-// CountWriter implements io.Writer and counts the size of the written data.
-type CountWriter struct {
+// countWriter implements io.Writer and counts the size of the written data.
+type countWriter struct {
 	w     io.Writer
 	Count int
 }
 
 // Write implements the standard Write interface.
-func (w *CountWriter) Write(p []byte) (int, error) {
+func (w *countWriter) Write(p []byte) (int, error) {
 	n, err := w.w.Write(p)
 	w.Count += n
 	return n, err
