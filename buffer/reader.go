@@ -45,11 +45,11 @@ func (r *Reader) ReadAt(b []byte, off int64) (int, error) {
 // Seek sets the next read position.
 func (r *Reader) Seek(offset int64, whence int) (int64, error) {
 	switch whence {
-	case 0:
+	case io.SeekStart:
 		offset += 0
-	case 1:
+	case io.SeekCurrent:
 		offset += int64(r.pos)
-	case 2:
+	case io.SeekEnd:
 		offset += int64(r.buf.Len())
 	default:
 		return 0, errors.New("invalid whence")
@@ -58,7 +58,7 @@ func (r *Reader) Seek(offset int64, whence int) (int64, error) {
 		return 0, errors.New("negative position")
 	}
 
-	if r.buf.Len() <= int(offset) {
+	if r.buf.Len() < int(offset) {
 		return 0, io.EOF
 	}
 	r.pos = int(offset)

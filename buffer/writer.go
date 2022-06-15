@@ -1,6 +1,9 @@
 package buffer
 
-import "errors"
+import (
+	"errors"
+	"io"
+)
 
 // Writer supports Buffer writing.
 type Writer struct {
@@ -44,11 +47,11 @@ func (w *Writer) WriteAt(b []byte, off int64) (int, error) {
 // Seek sets the next write position.
 func (w *Writer) Seek(offset int64, whence int) (int64, error) {
 	switch whence {
-	case 0:
+	case io.SeekStart:
 		offset += 0
-	case 1:
+	case io.SeekCurrent:
 		offset += int64(w.pos)
-	case 2:
+	case io.SeekEnd:
 		offset += int64(w.buf.Len())
 	default:
 		return 0, errors.New("invalid whence")
